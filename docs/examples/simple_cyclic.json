@@ -1,0 +1,13 @@
+{
+  "layer_height_mm": 0.1,
+  "target_format": "both",
+  "color_mappings": [
+    {
+      "input_filament": 1,
+      "output_palette": {
+        "type": "cyclic",
+        "pattern": [1, 2]
+      }
+    }
+  ]
+}
