@@ -4,17 +4,17 @@ from __future__ import annotations
 
 import logging
 import zipfile
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
 from lxml import etree
 
+from full_spectrum.encoding import filament_to_hex, hex_to_filament, is_sub_painted
+
 logger = logging.getLogger(__name__)
 
 _SECURE_PARSER = etree.XMLParser(resolve_entities=False, no_network=True)
-
-from full_spectrum.encoding import filament_to_hex, hex_to_filament, is_sub_painted
 
 
 class ThreeMFError(Exception):
@@ -98,8 +98,18 @@ def read_3mf(path: str | Path, flatten: bool = False) -> ThreeMFData:
             raise ThreeMFError("No <vertices> element found")
 
         verts = []
-        for v in vertices_el.findall("m:vertex", NAMESPACES):
-            verts.append([float(v.get("x", 0)), float(v.get("y", 0)), float(v.get("z", 0))])
+        for i, v in enumerate(vertices_el.findall("m:vertex", NAMESPACES)):
+            x_attr = v.get("x")
+            y_attr = v.get("y")
+            z_attr = v.get("z")
+            if x_attr is None or y_attr is None or z_attr is None:
+                raise ThreeMFError(
+                    f"Vertex {i}: missing required attribute(s) "
+                    f"(x={'present' if x_attr is not None else 'MISSING'}, "
+                    f"y={'present' if y_attr is not None else 'MISSING'}, "
+                    f"z={'present' if z_attr is not None else 'MISSING'})"
+                )
+            verts.append([float(x_attr), float(y_attr), float(z_attr)])
         vertices = np.array(verts, dtype=np.float64)
 
         # Parse triangles
@@ -112,9 +122,19 @@ def read_3mf(path: str | Path, flatten: bool = False) -> ThreeMFData:
         n_verts = len(verts)
 
         for i, tri in enumerate(triangles_el.findall("m:triangle", NAMESPACES)):
-            v1 = int(tri.get("v1", 0))
-            v2 = int(tri.get("v2", 0))
-            v3 = int(tri.get("v3", 0))
+            v1_attr = tri.get("v1")
+            v2_attr = tri.get("v2")
+            v3_attr = tri.get("v3")
+            if v1_attr is None or v2_attr is None or v3_attr is None:
+                raise ThreeMFError(
+                    f"Face {i}: missing required attribute(s) "
+                    f"(v1={'present' if v1_attr is not None else 'MISSING'}, "
+                    f"v2={'present' if v2_attr is not None else 'MISSING'}, "
+                    f"v3={'present' if v3_attr is not None else 'MISSING'})"
+                )
+            v1 = int(v1_attr)
+            v2 = int(v2_attr)
+            v3 = int(v3_attr)
             if not (0 <= v1 < n_verts and 0 <= v2 < n_verts and 0 <= v3 < n_verts):
                 raise ThreeMFError(
                     f"Face {i}: vertex index out of bounds "
@@ -170,11 +190,17 @@ def _find_mesh_element(
     if len(objects) == 0:
         raise ThreeMFError("No <object> elements found in 3MF model")
 
-    # Try each object for a direct mesh first
-    for obj in objects:
-        mesh_el = obj.find("m:mesh", NAMESPACES)
-        if mesh_el is not None:
-            return mesh_el
+    # Check for multi-object assemblies (rejected per spec — MVP supports single object only)
+    mesh_objects = [obj for obj in objects if obj.find("m:mesh", NAMESPACES) is not None]
+    if len(mesh_objects) > 1:
+        raise ThreeMFError(
+            f"Multiple objects with meshes found ({len(mesh_objects)}). "
+            "Only single-object 3MF files are supported in this version."
+        )
+
+    # Return the single direct mesh if found
+    if len(mesh_objects) == 1:
+        return mesh_objects[0].find("m:mesh", NAMESPACES)
 
     # No direct mesh found — look for component references
     for obj in objects:

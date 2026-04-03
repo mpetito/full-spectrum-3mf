@@ -45,7 +45,7 @@ def compute_face_layers(mesh: trimesh.Trimesh, layer_height: float) -> np.ndarra
     """Assign each face to a Z-layer based on its centroid Z coordinate.
     
     Returns an int array of shape (n_faces,) with 0-based layer indices.
-    Uses epsilon = 1% of layer_height for floating-point tolerance.
+    Uses epsilon = 0.1% of layer_height for floating-point tolerance.
     """
     centroids_z = mesh.triangles_center[:, 2]
     z_min = centroids_z.min()

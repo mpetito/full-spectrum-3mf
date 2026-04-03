@@ -60,7 +60,13 @@ def _parse_palette(data: dict) -> CyclicPalette | GradientPalette:
         raw_stops = data.get("stops")
         if not isinstance(raw_stops, list) or len(raw_stops) < 2:
             raise ConfigError("Gradient palette requires at least 2 stops")
-        stops = [GradientStop(t=s[0], filament=s[1]) for s in raw_stops]
+        stops = []
+        for i, s in enumerate(raw_stops):
+            if not isinstance(s, list) or len(s) != 2:
+                raise ConfigError(
+                    f"Gradient stop {i} must be in format [t, filament]"
+                )
+            stops.append(GradientStop(t=s[0], filament=s[1]))
         max_period = data.get("max_period", 8)
         return GradientPalette(stops=stops, max_period=max_period)
     else:

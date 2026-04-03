@@ -87,32 +87,53 @@ def apply_gradient(
     result = np.empty(len(layer_indices), dtype=np.int32)
     denom = max(total_layers - 1, 1)
 
-    for idx in range(len(layer_indices)):
-        layer = layer_indices[idx]
-        t = layer / denom
+    stop_ts = np.array([s[0] for s in stops], dtype=np.float64)
+    stop_colors = np.array([s[1] for s in stops], dtype=np.int32)
+    t_values = layer_indices.astype(np.float64) / denom
 
-        # Clamp t to stop range so out-of-range layers get nearest stop
-        t_min = stops[0][0]
-        t_max = stops[-1][0]
-        if t <= t_min:
-            result[idx] = stops[0][1]
-            continue
-        if t >= t_max:
-            result[idx] = stops[-1][1]
-            continue
+    # Clamp out-of-range layers to nearest stop color in bulk
+    low_mask = t_values <= stop_ts[0]
+    high_mask = t_values >= stop_ts[-1]
+    mid_mask = ~(low_mask | high_mask)
 
-        # Find enclosing stop pair
-        filament = stops[-1][1]  # fallback to last stop
-        for i in range(len(stops) - 1):
-            t0, c0 = stops[i]
-            t1, c1 = stops[i + 1]
-            if t0 <= t <= t1:
-                span = t1 - t0
-                local_t = (t - t0) / span if span > 1e-9 else 0.0
-                pattern = compute_gradient_pattern(local_t, c0, c1, max_period)
-                filament = pattern[layer % len(pattern)]
-                break
+    result[low_mask] = stop_colors[0]
+    result[high_mask] = stop_colors[-1]
 
-        result[idx] = filament
+    if not np.any(mid_mask):
+        return result
+
+    mid_indices = np.nonzero(mid_mask)[0]
+    mid_t_values = t_values[mid_mask]
+    mid_layers = layer_indices[mid_mask]
+
+    # Vectorized segment selection for all in-range faces
+    segment_indices = np.searchsorted(stop_ts, mid_t_values, side="right") - 1
+    segment_indices = np.clip(segment_indices, 0, len(stop_ts) - 2)
+
+    # Process in bulk per segment, then per unique layer within the segment
+    for seg_idx in np.unique(segment_indices):
+        seg_mask = segment_indices == seg_idx
+        seg_face_indices = mid_indices[seg_mask]
+        seg_layers = mid_layers[seg_mask]
+
+        t0 = stop_ts[seg_idx]
+        t1 = stop_ts[seg_idx + 1]
+        c0 = int(stop_colors[seg_idx])
+        c1 = int(stop_colors[seg_idx + 1])
+        span = t1 - t0
+
+        unique_layers, inverse = np.unique(seg_layers, return_inverse=True)
+
+        if span > 1e-9:
+            local_t_values = (unique_layers.astype(np.float64) / denom - t0) / span
+        else:
+            local_t_values = np.zeros(len(unique_layers), dtype=np.float64)
+
+        unique_assignments = np.empty(len(unique_layers), dtype=np.int32)
+        for u_idx, (layer, local_t) in enumerate(zip(unique_layers, local_t_values)):
+            pattern = compute_gradient_pattern(float(local_t), c0, c1, max_period)
+            unique_assignments[u_idx] = pattern[int(layer) % len(pattern)]
+
+        result[seg_face_indices] = unique_assignments[inverse]
 
     return result

@@ -86,6 +86,15 @@ def process(
         face_colors = data_3mf.face_colors
         default_filament = data_3mf.default_filament
 
+        # Validate face count consistency between trimesh and 3MF parser
+        if len(data_3mf.faces) != n_faces:
+            raise ValueError(
+                f"Face count mismatch: trimesh loaded {n_faces} faces but "
+                f"3MF parser found {len(data_3mf.faces)}. "
+                "The 3MF may contain multiple meshes/components with "
+                "incompatible face ordering."
+            )
+
     # Step 3: Cluster faces by input filament
     clusters = cluster_faces_by_filament(face_colors, n_faces, default_filament)
 
