@@ -1,0 +1,21 @@
+{
+  "layer_height_mm": 0.1,
+  "target_format": "both",
+  "color_mappings": [
+    {
+      "input_filament": 1,
+      "output_palette": {
+        "type": "cyclic",
+        "pattern": [1, 2]
+      }
+    },
+    {
+      "input_filament": 2,
+      "output_palette": {
+        "type": "gradient",
+        "stops": [[0.0, 3], [0.5, 4], [1.0, 5]],
+        "max_period": 6
+      }
+    }
+  ]
+}
