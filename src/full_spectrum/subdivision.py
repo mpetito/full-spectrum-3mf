@@ -113,15 +113,20 @@ def _subdivide(
     next_depth = max_depth - 1
     limit_sq = layer_height * layer_height
 
-    # Z-span of each edge (squared) — determines which edges cross layer boundaries
+    # 3D edge length squared — used for split-type decision (3-split vs 2-split)
+    len_sq_0 = (v1[0]-v0[0])**2 + (v1[1]-v0[1])**2 + (v1[2]-v0[2])**2
+    len_sq_1 = (v2[0]-v1[0])**2 + (v2[1]-v1[1])**2 + (v2[2]-v1[2])**2
+    len_sq_2 = (v0[0]-v2[0])**2 + (v0[1]-v2[1])**2 + (v0[2]-v2[2])**2
+
+    long0 = len_sq_0 > limit_sq
+    long1 = len_sq_1 > limit_sq
+    long2 = len_sq_2 > limit_sq
+    n_long = long0 + long1 + long2
+
+    # Z-span squared — used for edge selection within 2-split (keep most horizontal)
     dz_sq_0 = (z1 - z0) ** 2  # edge 0: v0→v1
     dz_sq_1 = (z2 - z1) ** 2  # edge 1: v1→v2
     dz_sq_2 = (z0 - z2) ** 2  # edge 2: v2→v0
-
-    long0 = dz_sq_0 > limit_sq
-    long1 = dz_sq_1 > limit_sq
-    long2 = dz_sq_2 > limit_sq
-    n_long = long0 + long1 + long2
 
     def _mid(a: Vert3, b: Vert3) -> Vert3:
         return ((a[0] + b[0]) * 0.5, (a[1] + b[1]) * 0.5, (a[2] + b[2]) * 0.5)
@@ -270,18 +275,23 @@ def _make_subdivider(
 
         nd = depth - 1
 
-        # Z-span of each edge (squared) — determines which edges cross layers
-        d0z = z1 - z0
-        d1z = z2 - z1
-        d2z = z0 - z2
+        # 3D edge length squared — used for split-type decision (3-split vs 2-split)
+        d0x = v1[0] - v0[0]; d0y = v1[1] - v0[1]; d0z = v1[2] - v0[2]
+        d1x = v2[0] - v1[0]; d1y = v2[1] - v1[1]; d1z = v2[2] - v1[2]
+        d2x = v0[0] - v2[0]; d2y = v0[1] - v2[1]; d2z = v0[2] - v2[2]
+        len_sq_0 = d0x*d0x + d0y*d0y + d0z*d0z
+        len_sq_1 = d1x*d1x + d1y*d1y + d1z*d1z
+        len_sq_2 = d2x*d2x + d2y*d2y + d2z*d2z
+
+        long0 = len_sq_0 > limit_sq
+        long1 = len_sq_1 > limit_sq
+        long2 = len_sq_2 > limit_sq
+        n_long = long0 + long1 + long2
+
+        # Z-span squared — used for edge selection within 2-split (keep most horizontal)
         dz_sq_0 = d0z * d0z  # edge 0: v0→v1
         dz_sq_1 = d1z * d1z  # edge 1: v1→v2
         dz_sq_2 = d2z * d2z  # edge 2: v2→v0
-
-        long0 = dz_sq_0 > limit_sq
-        long1 = dz_sq_1 > limit_sq
-        long2 = dz_sq_2 > limit_sq
-        n_long = long0 + long1 + long2
 
         if n_long == 3:
             # 3-split: bisect all 3 edges, 4 children

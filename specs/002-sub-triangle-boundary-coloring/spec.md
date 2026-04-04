@@ -17,14 +17,14 @@ A detailed research document on the TriangleSelector encoding format is availabl
 
 ### Why Sub-Triangle Coloring Over Mesh Subdivision
 
-| Criterion | Mesh Subdivision | Sub-Triangle Coloring |
-|---|---|---|
-| Triangle count impact | 10–50× multiplication | Zero change |
-| Slicer import performance | Degrades quadratically | No impact |
-| Boundary precision | Exact | Very high (~2–3 levels ≈ <0.01 mm at 0.08 mm layer) |
-| Output file size | Large (more vertices/triangles) | Small (longer hex strings) |
-| Slicer compatibility | Any slicer | Same slicers already targeted |
-| Round-trip safety | Geometry intact | Sub-painted data merged correctly by slicer tools |
+| Criterion                 | Mesh Subdivision                | Sub-Triangle Coloring                               |
+| ------------------------- | ------------------------------- | --------------------------------------------------- |
+| Triangle count impact     | 10–50× multiplication           | Zero change                                         |
+| Slicer import performance | Degrades quadratically          | No impact                                           |
+| Boundary precision        | Exact                           | Very high (~2–3 levels ≈ <0.01 mm at 0.08 mm layer) |
+| Output file size          | Large (more vertices/triangles) | Small (longer hex strings)                          |
+| Slicer compatibility      | Any slicer                      | Same slicers already targeted                       |
+| Round-trip safety         | Geometry intact                 | Sub-painted data merged correctly by slicer tools   |
 
 Sub-triangle coloring achieves the same visual result without performance regression. Mesh subdivision (Strategy C) is formally dropped from the roadmap.
 
@@ -117,6 +117,7 @@ Unit tests must cover: bisection tree encode/decode round-trips, boundary detect
 
 **DC-1: TriangleSelector Encoding Format**
 The PrusaSlicer TriangleSelector format must be followed exactly:
+
 - Each tree node = one 4-bit nibble
 - Node format: `bits[1:0]` = split type (00=leaf, 01=1-split, 10=2-split, 11=3-split); `bits[3:2]` = state (for leaves) or special_side (for splits)
 - Tree traversal: depth-first, children serialized in reverse index order
@@ -156,14 +157,14 @@ The pipeline currently produces `face_filaments: np.ndarray` (1D array of 1-base
 
 ## Decisions
 
-| # | Decision | Rationale |
-|---|---|---|
-| D-1 | Sub-triangle coloring over mesh subdivision | Zero triangle count change, no slicer performance regression, full convergence via recursive depth. See comparison table in Context. |
-| D-2 | Opt-in via `--boundary-split` CLI flag | Preserves full backward compatibility. Users who don't need boundary precision get identical behavior to spec 001. |
-| D-3 | Automatic convergence depth (cap 12) | Depth is not a tuning knob — it's driven by geometry. A cube face triangle spanning 200 layers needs depth ~8. The cap of 12 handles Z_span / layer_height up to 4096. |
-| D-4 | 1-split node type only, recursive depth | 2-split and 3-split are unnecessary. Recursive 1-splits halve Z-span each level, reaching arbitrary granularity. Simpler algorithm, same result. |
-| D-5 | Mesh subdivision (Strategy C) dropped from roadmap | Sub-triangle coloring is strictly superior for this use case. No further investment in geometry modification. |
-| D-6 | New `subdivision.py` module | Keeps boundary detection and tree construction isolated from existing encoding, mesh, and palette logic. Clean test boundary. |
+| #   | Decision                                             | Rationale                                                                                                                                                                            |
+| --- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| D-1 | Sub-triangle coloring over mesh subdivision          | Zero triangle count change, no slicer performance regression, full convergence via recursive depth. See comparison table in Context.                                                 |
+| D-2 | Opt-in via `--boundary-split` CLI flag               | Preserves full backward compatibility. Users who don't need boundary precision get identical behavior to spec 001.                                                                   |
+| D-3 | Automatic convergence depth (cap 12)                 | Depth is not a tuning knob — it's driven by geometry. A cube face triangle spanning 200 layers needs depth ~8. The cap of 12 handles Z_span / layer_height up to 4096.               |
+| D-4 | 1-split node type only, recursive depth              | 2-split and 3-split are unnecessary. Recursive 1-splits halve Z-span each level, reaching arbitrary granularity. Simpler algorithm, same result.                                     |
+| D-5 | Mesh subdivision (Strategy C) dropped from roadmap   | Sub-triangle coloring is strictly superior for this use case. No further investment in geometry modification.                                                                        |
+| D-6 | New `subdivision.py` module                          | Keeps boundary detection and tree construction isolated from existing encoding, mesh, and palette logic. Clean test boundary.                                                        |
 | D-7 | `write_3mf()` accepts hex strings, not filament ints | The writer should be format-agnostic. Hex strings are the native 3MF attribute format. The pipeline is responsible for converting filament indices to hex before calling the writer. |
 
 ## Open Questions

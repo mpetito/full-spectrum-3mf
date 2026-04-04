@@ -28,23 +28,23 @@ A Bambu Studio hand-painted cylinder (`samples/cylinder_bambu_painted.3mf`) was 
 
 ### 2.1 Split Type Usage
 
-| Split Type | Children | Count (all trees) | Usage |
-|---|---|---|---|
-| 1-split | 2 | **0** | Never used |
-| 2-split | 3 | 270,720 | 98.7% of all splits |
-| 3-split | 4 | 3,600 | 1.3% of all splits |
+| Split Type | Children | Count (all trees) | Usage               |
+| ---------- | -------- | ----------------- | ------------------- |
+| 1-split    | 2        | **0**             | Never used          |
+| 2-split    | 3        | 270,720           | 98.7% of all splits |
+| 3-split    | 4        | 3,600             | 1.3% of all splits  |
 
 Bambu Studio uses **zero 1-split nodes**. It exclusively uses 3-splits at the top levels and 2-splits throughout the remainder of the tree.
 
 ### 2.2 Tree Structure
 
-| Metric | Value |
-|---|---|
-| Max tree depth | 9 (uniform across all 720 trees) |
-| Total leaves (all trees) | 552,960 |
-| Average leaves per face | 768 |
-| Hex string lengths | 846 or 1,452 characters |
-| States used | 0 (default), 2 (extruder 2) |
+| Metric                   | Value                            |
+| ------------------------ | -------------------------------- |
+| Max tree depth           | 9 (uniform across all 720 trees) |
+| Total leaves (all trees) | 552,960                          |
+| Average leaves per face  | 768                              |
+| Hex string lengths       | 846 or 1,452 characters          |
+| States used              | 0 (default), 2 (extruder 2)      |
 
 ### 2.3 Subdivision Strategy
 
@@ -74,6 +74,7 @@ A 2-split with `special_side` = the most horizontal edge (the one NOT split) bis
 ```
 
 Children:
+
 - child[0] = (v0, v1, M12) — upper portion
 - child[1] = (v0, M12, M20) — narrow strip connecting upper to lower
 - child[2] = (M20, M12, v2) — lower portion
@@ -101,17 +102,17 @@ Both children still span from Z_top to Z_bottom (one vertex remains at the extre
 For a 33 mm cylinder at 0.1 mm layer height (330 layers):
 
 | Depth | Z-span (2-split) | Z-span (1-split) | Layers remaining |
-|---|---|---|---|
-| 0 | 33.000 mm | 33.000 mm | 330 |
-| 1 | 16.500 mm | 16.500 mm | 165 |
-| 2 | 8.250 mm | 8.250 mm | 82.5 |
-| 3 | 4.125 mm | 4.125 mm | 41.3 |
-| 4 | 2.063 mm | 2.063 mm | 20.6 |
-| 5 | 1.031 mm | 1.031 mm | 10.3 |
-| 6 | 0.516 mm | 0.516 mm | 5.2 |
-| 7 | 0.258 mm | 0.258 mm | 2.6 |
-| 8 | 0.129 mm | 0.129 mm | 1.3 |
-| 9 | 0.064 mm | 0.064 mm | 0.6 ✓ |
+| ----- | ---------------- | ---------------- | ---------------- |
+| 0     | 33.000 mm        | 33.000 mm        | 330              |
+| 1     | 16.500 mm        | 16.500 mm        | 165              |
+| 2     | 8.250 mm         | 8.250 mm         | 82.5             |
+| 3     | 4.125 mm         | 4.125 mm         | 41.3             |
+| 4     | 2.063 mm         | 2.063 mm         | 20.6             |
+| 5     | 1.031 mm         | 1.031 mm         | 10.3             |
+| 6     | 0.516 mm         | 0.516 mm         | 5.2              |
+| 7     | 0.258 mm         | 0.258 mm         | 2.6              |
+| 8     | 0.129 mm         | 0.129 mm         | 1.3              |
+| 9     | 0.064 mm         | 0.064 mm         | 0.6 ✓            |
 
 Both converge in the same number of levels — but only 2-split produces geometrically correct horizontal band cuts. The 1-split creates the same Z-span reduction per level but along diagonal lines, causing sub-triangles to straddle multiple layers despite having narrow Z-span.
 
@@ -119,21 +120,21 @@ Both converge in the same number of levels — but only 2-split produces geometr
 
 ## 3. Revised Decisions
 
-| # | Original Decision | Revised Decision | Rationale |
-|---|---|---|---|
-| D-4 | 1-split only | **2-split and 3-split required** | 1-split produces diagonal cuts, not horizontal bands. 2-split with horizontal edge kept creates exact horizontal cuts. 3-split used at top levels for efficient initial subdivision. Matches Bambu Studio behavior. |
-| D-5 | Mesh subdivision dropped | **Geometry slicing retained as opt-in fallback** | Geometry slicing (`--geometry-slice`) is a working, simpler alternative. Useful for debugging or for users who prefer explicit geometry over sub-triangle encoding. |
-| D-2 | Opt-in via `--boundary-split` | **Enabled by default** | Boundary splitting produces strictly better output. Users can disable with `--no-boundary-split`. |
+| #   | Original Decision             | Revised Decision                                 | Rationale                                                                                                                                                                                                           |
+| --- | ----------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D-4 | 1-split only                  | **2-split and 3-split required**                 | 1-split produces diagonal cuts, not horizontal bands. 2-split with horizontal edge kept creates exact horizontal cuts. 3-split used at top levels for efficient initial subdivision. Matches Bambu Studio behavior. |
+| D-5 | Mesh subdivision dropped      | **Geometry slicing retained as opt-in fallback** | Geometry slicing (`--geometry-slice`) is a working, simpler alternative. Useful for debugging or for users who prefer explicit geometry over sub-triangle encoding.                                                 |
+| D-2 | Opt-in via `--boundary-split` | **Enabled by default**                           | Boundary splitting produces strictly better output. Users can disable with `--no-boundary-split`.                                                                                                                   |
 
 ### New Decision: D-8 — Dual Strategy with Bisection Default
 
 The pipeline supports two boundary-handling strategies:
 
-| Strategy | Flag | Behavior |
-|---|---|---|
-| **Bisection** (default) | `--boundary-split` (default on) | Encodes boundary faces as multi-split bisection trees. Zero geometry change. Slicer-native encoding. |
-| **Geometry slicing** | `--geometry-slice` | Cuts mesh faces at Z-layer boundaries, creating new vertices/faces. Each sub-face spans ≤ 1 layer. Simple whole-face coloring. |
-| **None** | `--no-boundary-split` | No boundary handling. Whole-triangle centroid assignment only (spec 001 behavior). |
+| Strategy                | Flag                            | Behavior                                                                                                                       |
+| ----------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| **Bisection** (default) | `--boundary-split` (default on) | Encodes boundary faces as multi-split bisection trees. Zero geometry change. Slicer-native encoding.                           |
+| **Geometry slicing**    | `--geometry-slice`              | Cuts mesh faces at Z-layer boundaries, creating new vertices/faces. Each sub-face spans ≤ 1 layer. Simple whole-face coloring. |
+| **None**                | `--no-boundary-split`           | No boundary handling. Whole-triangle centroid assignment only (spec 001 behavior).                                             |
 
 ### New Decision: D-9 — Edge Selection Strategy for 2-Split
 
@@ -163,15 +164,17 @@ At each recursion level:
 
 **FR-2 (revised): Multi-Split Bisection Tree Encoding**
 For each boundary face, recursively subdivide using 2-split and 3-split nodes until every leaf sub-triangle's Z-span fits within a single layer band. At each level:
+
 - Use 3-split when no edge is clearly horizontal (all three edges have significant Z-span).
 - Use 2-split with `special_side` = the most horizontal edge (smallest |ΔZ| between endpoints).
-Assign each leaf the filament for the layer containing its centroid. Encode the resulting tree as a PrusaSlicer-compatible hex string.
+  Assign each leaf the filament for the layer containing its centroid. Encode the resulting tree as a PrusaSlicer-compatible hex string.
 
 **FR-4 (revised): Default-On Behavior**
 Boundary splitting is enabled by default. A `--no-boundary-split` CLI flag disables it. When disabled, output is byte-identical to spec 001 behavior.
 
 **FR-5 (revised): Config File Integration**
 JSON config supports:
+
 - `boundary_split: bool` (default `true`) — enable/disable boundary handling
 - `max_split_depth: int` (default `12`) — safety cap on recursion depth
 - `boundary_strategy: "bisection" | "geometry"` (default `"bisection"`) — select strategy
@@ -216,16 +219,16 @@ Additions and modifications to the original acceptance criteria:
 
 ### Files to Modify
 
-| File | Change |
-|---|---|
-| `subdivision.py` | Rewrite `_subdivide` / `_make_subdivider` to use 2-split and 3-split. Add edge selection by minimum |ΔZ|. Update `SplitNode` construction to use `split_sides=2` or `split_sides=3`. |
-| `encoding.py` | No changes needed — codec already supports all split types. |
-| `pipeline.py` | Make bisection the default path. Move geometry slicing behind `--geometry-slice` flag. Add `boundary_strategy` config field routing. |
-| `config.py` | Add `boundary_strategy` field. Change `boundary_split` default to `True`. |
-| `cli.py` | Add `--geometry-slice` flag. Change `--boundary-split` default to on. |
-| `mesh.py` | No changes — `slice_faces_at_layers` stays for geometry strategy. |
-| `test_subdivision.py` | Update tests for 2-split/3-split. Add spatial verification tests. |
-| `test_encoding.py` | Add 2-split and 3-split worked examples (already partially covered). |
+| File                  | Change                                                                                                                               |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | --- | ---------------------------------------------------------------------------- |
+| `subdivision.py`      | Rewrite `_subdivide` / `_make_subdivider` to use 2-split and 3-split. Add edge selection by minimum                                  | ΔZ  | . Update `SplitNode` construction to use `split_sides=2` or `split_sides=3`. |
+| `encoding.py`         | No changes needed — codec already supports all split types.                                                                          |
+| `pipeline.py`         | Make bisection the default path. Move geometry slicing behind `--geometry-slice` flag. Add `boundary_strategy` config field routing. |
+| `config.py`           | Add `boundary_strategy` field. Change `boundary_split` default to `True`.                                                            |
+| `cli.py`              | Add `--geometry-slice` flag. Change `--boundary-split` default to on.                                                                |
+| `mesh.py`             | No changes — `slice_faces_at_layers` stays for geometry strategy.                                                                    |
+| `test_subdivision.py` | Update tests for 2-split/3-split. Add spatial verification tests.                                                                    |
+| `test_encoding.py`    | Add 2-split and 3-split worked examples (already partially covered).                                                                 |
 
 ### Code retained from previous iteration
 
@@ -237,8 +240,8 @@ Additions and modifications to the original acceptance criteria:
 
 ## 7. Open Questions (Resolved)
 
-| Question | Resolution |
-|---|---|
+| Question                                    | Resolution                                                                                                                                      |
+| ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | OQ-3 from original spec: Maximum tree size? | Bambu Studio produces trees with 768 leaves per face (cylinder, 330 layers). Slicer import handles this without issue. Not a practical concern. |
-| Why did 1-split fail visually? | 1-split creates diagonal cut lines. Only 2-split/3-split produce horizontal cuts that align with print layers. Documented in Section 2.4 above. |
-| Is mesh subdivision needed? | Retained as opt-in fallback, not the primary strategy. Bisection is preferred for zero-geometry-change output. |
+| Why did 1-split fail visually?              | 1-split creates diagonal cut lines. Only 2-split/3-split produce horizontal cuts that align with print layers. Documented in Section 2.4 above. |
+| Is mesh subdivision needed?                 | Retained as opt-in fallback, not the primary strategy. Bisection is preferred for zero-geometry-change output.                                  |

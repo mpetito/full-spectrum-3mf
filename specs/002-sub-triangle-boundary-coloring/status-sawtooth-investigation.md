@@ -8,17 +8,17 @@
 
 The bisection tree encoder is functional and produces output that loads in Bambu Studio. Key milestones completed:
 
-| Milestone | Status |
-|---|---|
-| `layer_filament_map` construction | ✅ Fixed |
-| Parallel processing optimized (~3.5s pipeline) | ✅ |
-| Bambu `special_side` convention for all split types | ✅ Fixed |
-| 2-split child ordering (c0=apex, c1=middle, c2=base) | ✅ Fixed |
-| 3-split c2 vertex ordering `(m12, v2, m20)` | ✅ Fixed |
-| No 1-split nodes emitted (AC-14) | ✅ |
-| Output uniform across cylinder height | ✅ |
-| All 267 tests pass | ✅ |
-| **Clean horizontal band edges** | ❌ **Sawtooth artifact remains** |
+| Milestone                                            | Status                           |
+| ---------------------------------------------------- | -------------------------------- |
+| `layer_filament_map` construction                    | ✅ Fixed                         |
+| Parallel processing optimized (~3.5s pipeline)       | ✅                               |
+| Bambu `special_side` convention for all split types  | ✅ Fixed                         |
+| 2-split child ordering (c0=apex, c1=middle, c2=base) | ✅ Fixed                         |
+| 3-split c2 vertex ordering `(m12, v2, m20)`          | ✅ Fixed                         |
+| No 1-split nodes emitted (AC-14)                     | ✅                               |
+| Output uniform across cylinder height                | ✅                               |
+| All 267 tests pass                                   | ✅                               |
+| **Clean horizontal band edges**                      | ❌ **Sawtooth artifact remains** |
 
 Visual output shows alternating color bands at the correct Z-heights, but many band **edges have a sawtooth/serrated pattern** instead of clean horizontal lines.
 
@@ -37,12 +37,12 @@ Layer boundaries at 0.1mm intervals
 
 These do NOT align. Analysis of the cylinder (330 layers):
 
-| Metric | Value |
-|---|---|
-| Layer boundaries with misalignment > 0.01mm | **228 / 329 (69%)** |
-| Layer boundaries with misalignment > 0.03mm | 24 / 329 (7%) |
-| Maximum misalignment | 0.032mm |
-| Leaves straddling layer boundaries | **9,858 / 15,055 (65%)** |
+| Metric                                      | Value                    |
+| ------------------------------------------- | ------------------------ |
+| Layer boundaries with misalignment > 0.01mm | **228 / 329 (69%)**      |
+| Layer boundaries with misalignment > 0.03mm | 24 / 329 (7%)            |
+| Maximum misalignment                        | 0.032mm                  |
+| Leaves straddling layer boundaries          | **9,858 / 15,055 (65%)** |
 
 When a leaf sub-triangle straddles a layer boundary, its color is determined by centroid position. Different triangle shapes (from different parent split paths) produce centroids on opposite sides of the boundary → inconsistent coloring → sawtooth.
 
@@ -62,14 +62,14 @@ Bambu Studio uses **3D squared edge length** for classification:
 
 #### Comparison: Our output vs Bambu reference (single face)
 
-| Metric | Our Output | Bambu Reference |
-|---|---|---|
-| Hex string length | **22,582 chars** | 846 chars |
-| 3-split nodes | **0** | 5 |
-| 2-split nodes | **7,527** | 275 |
-| Leaf nodes | **15,055** | 566 |
-| Tree ratio | **27× larger** | baseline |
-| Root split type | 2-split | 3-split |
+| Metric            | Our Output       | Bambu Reference |
+| ----------------- | ---------------- | --------------- |
+| Hex string length | **22,582 chars** | 846 chars       |
+| 3-split nodes     | **0**            | 5               |
+| 2-split nodes     | **7,527**        | 275             |
+| Leaf nodes        | **15,055**       | 566             |
+| Tree ratio        | **27× larger**   | baseline        |
+| Root split type   | 2-split          | 3-split         |
 
 The 3-splits at the top levels are critical because they reduce ALL edge dimensions simultaneously, including the horizontal edge. Without them, each 2-split only bisects 2 of the 3 edges; the "middle" child (c1) still spans the full Z-range of its parent's non-kept edges, requiring many more levels to converge.
 
@@ -116,6 +116,7 @@ if n_long == 0:  → leaf (centroid assignment)
 ```
 
 Expected outcome:
+
 - Root: 3-split (all edges "long" in 3D) → matches Bambu
 - Depth 1: 3-split (horizontal sub-edge still 0.144mm > 0.1mm threshold) → matches Bambu
 - Depth 2+: 2-split, horizontal sub-edge < threshold, other edges still "long" → kept horizontal → clean cuts
@@ -126,15 +127,15 @@ Expected outcome:
 
 ## 4. Findings Summary: Bug Timeline
 
-| # | Bug | Fix Applied | Result |
-|---|---|---|---|
-| 1 | `layer_filament_map` not built for auto layers | Construct from cyclic pattern | Correct layer→filament mapping |
-| 2 | Performance: 60s for 720 faces | Parallel chunks, optimized fast path | ~3.5s |
-| 3 | `special_side` values wrong for split types | Map our edge→Bambu side convention | Correct split nibble encoding |
-| 4 | 2-split child ordering wrong | c0=apex, c1=middle, c2=base | Matches Bambu's `perform_split()` |
-| 5 | 3-split c2 vertex ordering wrong | `(m12, v2, m20)` not `(m20, m12, v2)` | Correct vertex labeling for recursion |
-| 6 | 3D edge length → fuzz at band edges | Switch to Z-span for edge selection | Horizontal cuts (but no 3-splits) |
-| **7** | **Z-span for split-TYPE → no 3-splits → 27× tree size → sawtooth** | **Not yet applied** | **Pending: hybrid 3D/Z-span approach** |
+| #     | Bug                                                                | Fix Applied                           | Result                                 |
+| ----- | ------------------------------------------------------------------ | ------------------------------------- | -------------------------------------- |
+| 1     | `layer_filament_map` not built for auto layers                     | Construct from cyclic pattern         | Correct layer→filament mapping         |
+| 2     | Performance: 60s for 720 faces                                     | Parallel chunks, optimized fast path  | ~3.5s                                  |
+| 3     | `special_side` values wrong for split types                        | Map our edge→Bambu side convention    | Correct split nibble encoding          |
+| 4     | 2-split child ordering wrong                                       | c0=apex, c1=middle, c2=base           | Matches Bambu's `perform_split()`      |
+| 5     | 3-split c2 vertex ordering wrong                                   | `(m12, v2, m20)` not `(m20, m12, v2)` | Correct vertex labeling for recursion  |
+| 6     | 3D edge length → fuzz at band edges                                | Switch to Z-span for edge selection   | Horizontal cuts (but no 3-splits)      |
+| **7** | **Z-span for split-TYPE → no 3-splits → 27× tree size → sawtooth** | **Not yet applied**                   | **Pending: hybrid 3D/Z-span approach** |
 
 ---
 
@@ -165,11 +166,11 @@ All 720 boundary faces on the cylinder have identical Z topology:
 
 For the cylinder's horizontal edge:
 
-| Depth | 3D Length (mm) | 3D Length² | > limit_sq (0.01)? |
-|---|---|---|---|
-| 0 | 0.2880 | 0.0829 | ✅ long (→ 3-split) |
-| 1 | 0.1440 | 0.0207 | ✅ long (→ 3-split) |
-| 2 | 0.0720 | 0.0052 | ❌ short (→ 2-split) |
+| Depth | 3D Length (mm) | 3D Length² | > limit_sq (0.01)?   |
+| ----- | -------------- | ---------- | -------------------- |
+| 0     | 0.2880         | 0.0829     | ✅ long (→ 3-split)  |
+| 1     | 0.1440         | 0.0207     | ✅ long (→ 3-split)  |
+| 2     | 0.0720         | 0.0052     | ❌ short (→ 2-split) |
 
 This matches Bambu's 5 3-splits: 1 at depth 0 + 4 at depth 1 = 5 total.
 
@@ -219,14 +220,14 @@ BambuStudio CLI requires **self-contained BBL 3MF files** to slice correctly. Ou
 
 A sliceable BBL 3MF must contain:
 
-| Element | Purpose | Our output |
-|---|---|---|
-| `<metadata name="Application">BambuStudio-XX.XX.XX.XX</metadata>` | Triggers `is_bbl_3mf` flag; enables MMU segmentation parsing | ❌ Missing |
-| `Metadata/project_settings.config` | Machine, process, and filament settings | ❌ Missing |
-| `Metadata/model_settings.config` | Plate metadata incl. `filament_maps` | ❌ Missing |
-| `Metadata/plate_N.config` | Per-plate overrides | ❌ Missing |
-| `mmu_segmentation_facets` attribute (per volume) | Bisection tree paint data | ✅ Present (as `paint_color`) |
-| `filament_diameter.size() > 1` in config | Triggers multi-material slicing | ❌ Only 1 filament declared |
+| Element                                                           | Purpose                                                      | Our output                    |
+| ----------------------------------------------------------------- | ------------------------------------------------------------ | ----------------------------- |
+| `<metadata name="Application">BambuStudio-XX.XX.XX.XX</metadata>` | Triggers `is_bbl_3mf` flag; enables MMU segmentation parsing | ❌ Missing                    |
+| `Metadata/project_settings.config`                                | Machine, process, and filament settings                      | ❌ Missing                    |
+| `Metadata/model_settings.config`                                  | Plate metadata incl. `filament_maps`                         | ❌ Missing                    |
+| `Metadata/plate_N.config`                                         | Per-plate overrides                                          | ❌ Missing                    |
+| `mmu_segmentation_facets` attribute (per volume)                  | Bisection tree paint data                                    | ✅ Present (as `paint_color`) |
+| `filament_diameter.size() > 1` in config                          | Triggers multi-material slicing                              | ❌ Only 1 filament declared   |
 
 Without the BBL metadata, BambuStudio crashes with access violation (0xC0000005) — it cannot create plate triangles.
 
@@ -264,17 +265,17 @@ OrcaSlicer 2.3.2 rejects BambuStudio 2.5 3MF files with "Version Check: File Ver
 
 ## 8. Files Modified (This Session)
 
-| File | Change |
-|---|---|
+| File                               | Change                                                                                                                                   |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | `src/full_spectrum/subdivision.py` | Replaced 3D edge length with Z-span squared for edge classification; merged n_long==1 into n_long>=1 block; eliminated 1-split code path |
-| `tests/unit/test_subdivision.py` | Updated spatial verification to use correct Bambu convention vertex ordering for 2-split children |
+| `tests/unit/test_subdivision.py`   | Updated spatial verification to use correct Bambu convention vertex ordering for 2-split children                                        |
 
 ---
 
 ## 8. Diagnostic Scripts Created
 
-| File | Purpose |
-|---|---|
-| `samples/_analyze_sawtooth.py` | Leaf-level Z-span analysis, straddling leaf count and depth distribution |
+| File                            | Purpose                                                                   |
+| ------------------------------- | ------------------------------------------------------------------------- |
+| `samples/_analyze_sawtooth.py`  | Leaf-level Z-span analysis, straddling leaf count and depth distribution  |
 | `samples/_analyze_sawtooth2.py` | Face type classification, binary cut vs layer boundary alignment analysis |
-| `samples/_compare_bambu.py` | Per-face tree structure comparison between our output and Bambu reference |
+| `samples/_compare_bambu.py`     | Per-face tree structure comparison between our output and Bambu reference |
