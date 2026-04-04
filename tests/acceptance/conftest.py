@@ -35,6 +35,12 @@ def slicer_info():
         if path_str:
             p = Path(path_str)
             if p.is_file():
+                if slicer_type == "orca":
+                    pytest.skip(
+                        "OrcaSlicer is configured but the committed BambuStudio "
+                        "fixture 3MFs are not Orca-compatible yet; use "
+                        "BAMBUSTUDIO_BIN or add Orca-native fixtures."
+                    )
                 return SlicerInfo(path=p, slicer_type=slicer_type)
     pytest.skip("No slicer binary available (set BAMBUSTUDIO_BIN or ORCASLICER_BIN)")
 

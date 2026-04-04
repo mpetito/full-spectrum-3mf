@@ -14,7 +14,7 @@ This spec defines acceptance tests that run the full pipeline: `full-spectrum` C
 
 | # | Decision | Choice | Rationale |
 |---|----------|--------|-----------|
-| D1 | Slicer preference | OrcaSlicer primary, BambuStudio fallback | OrcaSlicer is open-source with documented CLI; both share PrusaSlicer lineage and similar G-code output |
+| D1 | Slicer preference | BambuStudio primary, OrcaSlicer fallback | BambuStudio's self-contained BBL 3MF fixtures can be sliced without external profiles; OrcaSlicer 2.3.x rejects BambuStudio 2.5 fixture files. Revisit when Orca-native fixtures are added. |
 | D2 | Profile format | JSON | Both slicers use JSON profiles natively |
 | D3 | CLI invocation for full-spectrum step | CliRunner | Existing test pattern in the project, faster than subprocess |
 | D4 | CLI invocation for slicer step | `subprocess.run` | Must be a real binary — no mocking — the entire purpose is third-party validation |
@@ -52,8 +52,8 @@ The parser must handle both formats transparently — a single function that rec
 A fixture or utility that:
 
 1. Discovers the slicer binary from environment variables:
-   - `ORCASLICER_BIN` (preferred)
-   - `BAMBUSTUDIO_BIN` (fallback)
+   - `BAMBUSTUDIO_BIN` (preferred — self-contained BBL fixtures work without external profiles)
+   - `ORCASLICER_BIN` (fallback — currently skipped; Orca 2.3.x rejects BBL fixture files)
 2. Invokes the slicer on a given 3MF input file with the test profiles
 3. Extracts the G-code from the output 3MF ZIP (`Metadata/plate_1.gcode`)
 4. Returns the G-code as a string

@@ -35,7 +35,7 @@ def find_boundary_faces(
     band_high = band_low + layer_height
 
     # Per-face vertex Z coordinates, shape (F, 3)
-    face_verts_z = mesh.vertices[mesh.faces][:, :, 2]
+    face_verts_z = mesh.vertices[:, 2][mesh.faces]
     z_min_per_face = face_verts_z.min(axis=1)
     z_max_per_face = face_verts_z.max(axis=1)
 
