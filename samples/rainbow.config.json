@@ -1,0 +1,14 @@
+{
+  "layer_height_mm": 0.08,
+  "target_format": "bambu",
+  "color_mappings": [
+    {
+      "input_filament": 1,
+      "output_palette": {
+        "type": "gradient",
+        "stops": [[0.0, 1], [0.5, 2], [1.0, 3]],
+        "max_period": 5
+      }
+    }
+  ]
+}
