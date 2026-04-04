@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+MAX_FILAMENTS = 10
+
 # 1-based filament index → hex string (whole-triangle; low 2 bits = 00)
 FILAMENT_HEX_TABLE: dict[int, str] = {
     1: "4", 2: "8", 3: "0C", 4: "1C", 5: "2C",
@@ -102,6 +104,9 @@ def _collect_nibbles(node: BisectionNode, nibbles: list[int]) -> None:
         raise TypeError(f"Unknown node type: {type(node)}")
 
 
+HEX_CHARS = "0123456789ABCDEF"
+
+
 def encode_bisection_tree(node: BisectionNode) -> str:
     """Encode a bisection tree to a PrusaSlicer-compatible hex string.
 
@@ -110,11 +115,8 @@ def encode_bisection_tree(node: BisectionNode) -> str:
     nibbles: list[int] = []
     _collect_nibbles(node, nibbles)
     # Build reversed: nibbles are in DFS order, hex string is reversed
-    chars = [_HEX_CHARS[nib] for nib in reversed(nibbles)]
+    chars = [HEX_CHARS[nib] for nib in reversed(nibbles)]
     return "".join(chars)
-
-
-_HEX_CHARS = "0123456789ABCDEF"
 
 
 def decode_bisection_tree(hex_str: str) -> BisectionNode:
@@ -127,9 +129,14 @@ def decode_bisection_tree(hex_str: str) -> BisectionNode:
         raise ValueError("Empty hex string")
     chars = list(hex_str.upper())
     pos = len(chars) - 1  # start from rightmost (root)
+    max_depth = min(len(chars) * 4, 500)  # cap recursion for malicious input
+    depth = 0
 
     def _read() -> BisectionNode:
-        nonlocal pos
+        nonlocal pos, depth
+        depth += 1
+        if depth > max_depth:
+            raise ValueError(f"Tree too deep (>{max_depth}); possibly malformed input")
         if pos < 0:
             raise ValueError("Unexpected end of hex string while decoding")
         nibble = int(chars[pos], 16)

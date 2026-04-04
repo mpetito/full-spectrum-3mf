@@ -7,9 +7,28 @@ from pathlib import Path
 import numpy as np
 import trimesh
 
+LAYER_EPSILON_FACTOR = 0.001
+
 
 class MeshError(Exception):
     """Raised for mesh loading or processing errors."""
+
+
+def cluster_faces_by_filament(
+    face_colors: dict[int, int],
+    n_faces: int,
+    default_filament: int = 1,
+) -> dict[int, np.ndarray]:
+    """Group face indices by their assigned filament.
+
+    Faces not in face_colors are assigned the default_filament.
+    Returns {filament: np.ndarray([face_idx, ...])}.
+    """
+    clusters: dict[int, list[int]] = {}
+    for i in range(n_faces):
+        filament = face_colors.get(i, default_filament)
+        clusters.setdefault(filament, []).append(i)
+    return {k: np.array(v, dtype=np.int64) for k, v in clusters.items()}
 
 
 def load_mesh(path: str | Path) -> trimesh.Trimesh:
@@ -49,7 +68,7 @@ def compute_face_layers(mesh: trimesh.Trimesh, layer_height: float) -> np.ndarra
     """
     centroids_z = mesh.triangles_center[:, 2]
     z_min = centroids_z.min()
-    epsilon = layer_height * 0.001
+    epsilon = layer_height * LAYER_EPSILON_FACTOR
     layer_indices = np.floor((centroids_z - z_min + epsilon) / layer_height).astype(int)
     return layer_indices
 
@@ -69,9 +88,12 @@ def compute_region_layers(
     Returns:
         (layer_indices, total_layers) — layers are 0-based relative to region z_min
     """
+    if len(face_indices) == 0:
+        return np.array([], dtype=int), 0
+
     centroids_z = mesh.triangles_center[face_indices, 2]
     z_min = centroids_z.min()
-    epsilon = layer_height * 0.001
+    epsilon = layer_height * LAYER_EPSILON_FACTOR
     layer_indices = np.floor((centroids_z - z_min + epsilon) / layer_height).astype(int)
     total_layers = int(layer_indices.max()) + 1 if len(layer_indices) > 0 else 0
     return layer_indices, total_layers
@@ -100,7 +122,7 @@ def slice_faces_at_layers(
         - new_faces: (F', 3) int array (F' >= F)
         - parent_map: (F',) int array mapping each new face to its original face index
     """
-    eps = layer_height * 0.001
+    eps = layer_height * LAYER_EPSILON_FACTOR
 
     if global_z_min is None:
         centroids_z = vertices[faces].mean(axis=1)[:, 2]
@@ -216,20 +238,3 @@ def slice_faces_at_layers(
     parent_map = np.array(out_parent, dtype=np.int64)
 
     return new_vertices, new_faces, parent_map
-
-
-def cluster_faces_by_filament(
-    face_colors: dict[int, int],
-    n_faces: int,
-    default_filament: int = 1,
-) -> dict[int, np.ndarray]:
-    """Group face indices by their assigned filament.
-    
-    Faces not in face_colors are assigned the default_filament.
-    Returns {filament: np.ndarray([face_idx, ...])}.
-    """
-    clusters: dict[int, list[int]] = {}
-    for i in range(n_faces):
-        filament = face_colors.get(i, default_filament)
-        clusters.setdefault(filament, []).append(i)
-    return {k: np.array(v, dtype=np.int64) for k, v in clusters.items()}

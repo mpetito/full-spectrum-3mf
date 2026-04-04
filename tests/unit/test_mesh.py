@@ -8,11 +8,11 @@ import trimesh
 
 from full_spectrum.mesh import (
     MeshError,
-    cluster_faces_by_filament,
     compute_face_layers,
     compute_region_layers,
     load_mesh,
 )
+from full_spectrum.mesh import cluster_faces_by_filament
 
 
 @pytest.fixture

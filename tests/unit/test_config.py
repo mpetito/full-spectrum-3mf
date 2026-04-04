@@ -110,7 +110,7 @@ class TestDefaultConfig:
         m = config.color_mappings[0]
         assert m.input_filament == 1
         assert isinstance(m.output_palette, CyclicPalette)
-        assert m.output_palette.pattern == [1, 2]
+        assert m.output_palette.pattern == (1, 2)
 
 
 class TestParseConfigEdgeCases:

@@ -7,7 +7,6 @@ from full_spectrum.palette import (
     PaletteError,
     apply_cyclic,
     apply_gradient,
-    compute_gradient_pattern,
 )
 
 
@@ -26,52 +25,6 @@ class TestApplyCyclic:
         layers = np.array([0, 1, 2, 3, 4, 5])
         result = apply_cyclic(layers, [1, 2, 3])
         np.testing.assert_array_equal(result, [1, 2, 3, 1, 2, 3])
-
-
-class TestComputeGradientPattern:
-    def test_ratio_zero(self) -> None:
-        assert compute_gradient_pattern(0.0, 1, 2) == [1]
-
-    def test_ratio_one(self) -> None:
-        assert compute_gradient_pattern(1.0, 1, 2) == [2]
-
-    def test_ratio_half(self) -> None:
-        pattern = compute_gradient_pattern(0.5, 1, 2)
-        assert len(pattern) == 2
-        assert set(pattern) == {1, 2}
-
-    def test_ratio_quarter(self) -> None:
-        # R=0.25: minority=B(2), majority=A(1), period=round(1/0.25)=4
-        pattern = compute_gradient_pattern(0.25, 1, 2)
-        assert len(pattern) == 4
-        assert pattern[0] == 2  # minority anchored first
-        assert pattern.count(1) == 3
-        assert pattern.count(2) == 1
-
-    def test_ratio_third(self) -> None:
-        # R=0.33: period=round(1/0.33)=3
-        pattern = compute_gradient_pattern(0.33, 1, 2)
-        assert len(pattern) == 3
-        assert pattern[0] == 2  # minority
-        assert pattern.count(1) == 2
-
-    def test_ratio_three_quarter(self) -> None:
-        # R=0.75: minority=A(1), majority=B(2), period=round(1/0.25)=4
-        pattern = compute_gradient_pattern(0.75, 1, 2)
-        assert len(pattern) == 4
-        assert pattern[0] == 1  # minority is A at high ratio
-        assert pattern.count(2) == 3
-
-    def test_period_clamp(self) -> None:
-        # Very small ratio: period should be clamped to max_period
-        pattern = compute_gradient_pattern(0.05, 1, 2, max_period=6)
-        assert len(pattern) <= 6
-
-    def test_edge_near_zero(self) -> None:
-        assert compute_gradient_pattern(0.005, 1, 2) == [1]
-
-    def test_edge_near_one(self) -> None:
-        assert compute_gradient_pattern(0.995, 1, 2) == [2]
 
 
 class TestApplyGradient:

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 import click
@@ -11,7 +12,6 @@ import click
 from full_spectrum import __version__
 from full_spectrum.config import (
     ConfigError,
-    FullSpectrumConfig,
     default_config,
     load_config,
     validate_config,
@@ -78,7 +78,7 @@ def _setup_logging(verbose: bool, quiet: bool) -> None:
     "--max-split-depth",
     type=int,
     default=None,
-    help="Max recursion depth for boundary splitting (default: 12).",
+    help="Max recursion depth for boundary splitting (default: 9).",
 )
 @click.option(
     "--geometry-slice",
@@ -117,14 +117,7 @@ def main(
             cfg = load_config(config_path)
             # CLI --layer-height overrides config
             if layer_height is not None:
-                cfg = FullSpectrumConfig(
-                    layer_height_mm=layer_height,
-                    target_format=cfg.target_format,
-                    color_mappings=cfg.color_mappings,
-                    boundary_split=cfg.boundary_split,
-                    max_split_depth=cfg.max_split_depth,
-                    boundary_strategy=cfg.boundary_strategy,
-                )
+                cfg = replace(cfg, layer_height_mm=layer_height)
         elif layer_height is not None:
             fmt = target_format or "both"
             cfg = default_config(layer_height, fmt)
@@ -136,47 +129,19 @@ def main(
 
         # CLI --format overrides config
         if target_format is not None:
-            cfg = FullSpectrumConfig(
-                layer_height_mm=cfg.layer_height_mm,
-                target_format=target_format,
-                color_mappings=cfg.color_mappings,
-                boundary_split=cfg.boundary_split,
-                max_split_depth=cfg.max_split_depth,
-                boundary_strategy=cfg.boundary_strategy,
-            )
+            cfg = replace(cfg, target_format=target_format)
 
         # CLI --boundary-split overrides config
         if boundary_split is not None:
-            cfg = FullSpectrumConfig(
-                layer_height_mm=cfg.layer_height_mm,
-                target_format=cfg.target_format,
-                color_mappings=cfg.color_mappings,
-                boundary_split=boundary_split,
-                max_split_depth=cfg.max_split_depth,
-                boundary_strategy=cfg.boundary_strategy,
-            )
+            cfg = replace(cfg, boundary_split=boundary_split)
 
         # CLI --max-split-depth overrides config
         if max_split_depth is not None:
-            cfg = FullSpectrumConfig(
-                layer_height_mm=cfg.layer_height_mm,
-                target_format=cfg.target_format,
-                color_mappings=cfg.color_mappings,
-                boundary_split=cfg.boundary_split,
-                max_split_depth=max_split_depth,
-                boundary_strategy=cfg.boundary_strategy,
-            )
+            cfg = replace(cfg, max_split_depth=max_split_depth)
 
         # CLI --geometry-slice overrides strategy
         if geometry_slice:
-            cfg = FullSpectrumConfig(
-                layer_height_mm=cfg.layer_height_mm,
-                target_format=cfg.target_format,
-                color_mappings=cfg.color_mappings,
-                boundary_split=True,
-                max_split_depth=cfg.max_split_depth,
-                boundary_strategy="geometry",
-            )
+            cfg = replace(cfg, boundary_split=True, boundary_strategy="geometry")
 
         # Validate
         warnings = validate_config(cfg)

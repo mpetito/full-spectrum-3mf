@@ -18,12 +18,13 @@ from full_spectrum.config import (
 )
 from full_spectrum.encoding import filament_to_hex
 from full_spectrum.mesh import (
-    cluster_faces_by_filament,
     compute_region_layers,
+    LAYER_EPSILON_FACTOR,
     load_mesh,
     slice_faces_at_layers,
+    cluster_faces_by_filament,
 )
-from full_spectrum.palette import apply_cyclic, apply_gradient
+from full_spectrum.palette import apply_cyclic, apply_gradient, build_gradient_layer_map
 from full_spectrum.subdivision import encode_boundary_faces
 from full_spectrum.threemf import read_3mf, write_3mf
 
@@ -54,7 +55,7 @@ def _find_mapping(
 
 def _default_cyclic_mapping() -> CyclicPalette:
     """Default palette when no mapping is configured."""
-    return CyclicPalette(pattern=[1, 2])
+    return CyclicPalette(pattern=(1, 2))
 
 
 def _build_layer_filament_map(
@@ -68,9 +69,12 @@ def _build_layer_filament_map(
 
     Uses the same global_z_min reference as ``encode_boundary_faces`` so layer
     indices are consistent between the map and the subdivision code.
+
+    Each cluster only writes its own occupied layers, so multi-filament
+    inputs do not overwrite each other.
     """
     lh = config.layer_height_mm
-    epsilon = lh * 0.001
+    epsilon = lh * LAYER_EPSILON_FACTOR
 
     # global_z_min must match encode_boundary_faces (centroid-based)
     global_z_min = float(mesh.triangles_center[:, 2].min())
@@ -78,7 +82,7 @@ def _build_layer_filament_map(
     max_layer = max(0, int(np.floor((vertex_z_max - global_z_min + epsilon) / lh)))
 
     # Initialise every layer to default
-    layer_map: dict[int, int] = {l: default_filament for l in range(max_layer + 1)}
+    layer_map: dict[int, int] = {layer: default_filament for layer in range(max_layer + 1)}
 
     for input_fil, face_indices in clusters.items():
         mapping = _find_mapping(config, input_fil)
@@ -87,42 +91,38 @@ def _build_layer_filament_map(
         else:
             palette = mapping.output_palette
 
-        # Compute region-local z_min (same logic as compute_region_layers)
-        region_centroids_z = mesh.triangles_center[face_indices, 2]
-        region_z_min = float(region_centroids_z.min())
+        # Delegate layer computation to compute_region_layers
+        layer_indices, region_layers = compute_region_layers(
+            mesh, config.layer_height_mm, face_indices
+        )
 
         # Offset between global and region-local layer indices
+        region_centroids_z = mesh.triangles_center[face_indices, 2]
+        region_z_min = float(region_centroids_z.min())
         region_offset = max(
             0, int(np.floor((region_z_min - global_z_min + epsilon) / lh))
         )
 
-        # Determine the region layer count from centroids (like compute_region_layers)
-        local_indices = np.floor(
-            (region_centroids_z - region_z_min + epsilon) / lh
-        ).astype(int)
-        region_layers = int(local_indices.max()) + 1 if len(local_indices) > 0 else 1
+        # All global layers this cluster spans (not just centroid layers,
+        # because boundary faces cross intermediate layers too)
+        occupied_global = range(region_offset, region_offset + region_layers)
 
         if isinstance(palette, CyclicPalette):
-            for gl in range(max_layer + 1):
-                local_l = gl - region_offset
-                if local_l >= 0:
-                    layer_map[gl] = palette.pattern[local_l % len(palette.pattern)]
+            for gl in occupied_global:
+                if gl > max_layer:
+                    break
+                layer_map[gl] = palette.pattern[(gl - region_offset) % len(palette.pattern)]
 
         elif isinstance(palette, GradientPalette):
             stops = [(s.t, s.filament) for s in palette.stops]
-            # For each global layer, apply the gradient using the local position
-            for gl in range(max_layer + 1):
+            # Build the full gradient layer map for this region
+            gradient_map = build_gradient_layer_map(
+                region_layers, stops
+            )
+            for gl in occupied_global:
                 local_l = gl - region_offset
-                if local_l < 0:
-                    continue
-                # apply_gradient expects arrays; compute single-element result
-                arr = apply_gradient(
-                    np.array([local_l], dtype=np.int32),
-                    region_layers,
-                    stops,
-                    palette.max_period,
-                )
-                layer_map[gl] = int(arr[0])
+                if 0 <= local_l < region_layers:
+                    layer_map[gl] = int(gradient_map[local_l])
 
     return layer_map
 
@@ -225,7 +225,7 @@ def process(
         elif isinstance(palette, GradientPalette):
             stops = [(s.t, s.filament) for s in palette.stops]
             assigned = apply_gradient(
-                layer_indices, region_layers, stops, palette.max_period
+                layer_indices, region_layers, stops
             )
         else:
             warnings.append(f"Unknown palette type for filament {input_fil}; skipping")

@@ -6,6 +6,8 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from full_spectrum.encoding import MAX_FILAMENTS
+
 
 class ConfigError(Exception):
     """Raised for invalid configuration."""
@@ -14,7 +16,7 @@ class ConfigError(Exception):
 @dataclass(frozen=True)
 class CyclicPalette:
     """Repeating sequence of filament slot indices."""
-    pattern: list[int]
+    pattern: tuple[int, ...]
     type: str = field(default="cyclic", init=False)
 
 
@@ -28,8 +30,7 @@ class GradientStop:
 @dataclass(frozen=True)
 class GradientPalette:
     """Frequency-modulated gradient with minority-color anchoring."""
-    stops: list[GradientStop]
-    max_period: int = 8
+    stops: tuple[GradientStop, ...]
     type: str = field(default="gradient", init=False)
 
 
@@ -45,7 +46,7 @@ class FullSpectrumConfig:
     """Top-level configuration for the Full Spectrum pipeline."""
     layer_height_mm: float
     target_format: str
-    color_mappings: list[ColorMapping]
+    color_mappings: tuple[ColorMapping, ...]
     boundary_split: bool = True
     max_split_depth: int = 9
     boundary_strategy: str = "bisection"
@@ -58,7 +59,7 @@ def _parse_palette(data: dict) -> CyclicPalette | GradientPalette:
         pattern = data.get("pattern")
         if not isinstance(pattern, list) or not pattern:
             raise ConfigError("Cyclic palette requires non-empty 'pattern' list")
-        return CyclicPalette(pattern=pattern)
+        return CyclicPalette(pattern=tuple(pattern))
     elif palette_type == "gradient":
         raw_stops = data.get("stops")
         if not isinstance(raw_stops, list) or len(raw_stops) < 2:
@@ -70,8 +71,7 @@ def _parse_palette(data: dict) -> CyclicPalette | GradientPalette:
                     f"Gradient stop {i} must be in format [t, filament]"
                 )
             stops.append(GradientStop(t=s[0], filament=s[1]))
-        max_period = data.get("max_period", 8)
-        return GradientPalette(stops=stops, max_period=max_period)
+        return GradientPalette(stops=tuple(stops))
     else:
         raise ConfigError(f"Unknown palette type: {palette_type!r}")
 
@@ -112,7 +112,7 @@ def load_config(path: str | Path) -> FullSpectrumConfig:
     return FullSpectrumConfig(
         layer_height_mm=layer_height,
         target_format=target_format,
-        color_mappings=mappings,
+        color_mappings=tuple(mappings),
         boundary_split=raw.get("boundary_split", True),
         max_split_depth=raw.get("max_split_depth", 9),
         boundary_strategy=raw.get("boundary_strategy", "bisection"),
@@ -153,17 +153,17 @@ def validate_config(config: FullSpectrumConfig) -> list[str]:
 
     # Color mappings
     for i, cm in enumerate(config.color_mappings):
-        if not (1 <= cm.input_filament <= 10):
+        if not (1 <= cm.input_filament <= MAX_FILAMENTS):
             raise ConfigError(
-                f"color_mappings[{i}]: input_filament {cm.input_filament} outside range [1, 10]"
+                f"color_mappings[{i}]: input_filament {cm.input_filament} outside range [1, {MAX_FILAMENTS}]"
             )
 
         palette = cm.output_palette
         if isinstance(palette, CyclicPalette):
             for j, f in enumerate(palette.pattern):
-                if not (1 <= f <= 10):
+                if not (1 <= f <= MAX_FILAMENTS):
                     raise ConfigError(
-                        f"color_mappings[{i}].pattern[{j}]: filament {f} outside range [1, 10]"
+                        f"color_mappings[{i}].pattern[{j}]: filament {f} outside range [1, {MAX_FILAMENTS}]"
                     )
         elif isinstance(palette, GradientPalette):
             # Stops sorted by t
@@ -178,9 +178,9 @@ def validate_config(config: FullSpectrumConfig) -> list[str]:
                     raise ConfigError(
                         f"color_mappings[{i}].stops[{j}]: t={stop.t} outside [0.0, 1.0]"
                     )
-                if not (1 <= stop.filament <= 10):
+                if not (1 <= stop.filament <= MAX_FILAMENTS):
                     raise ConfigError(
-                        f"color_mappings[{i}].stops[{j}]: filament {stop.filament} outside range [1, 10]"
+                        f"color_mappings[{i}].stops[{j}]: filament {stop.filament} outside range [1, {MAX_FILAMENTS}]"
                     )
 
     return warnings
@@ -191,10 +191,10 @@ def default_config(layer_height: float, target_format: str = "both") -> FullSpec
     return FullSpectrumConfig(
         layer_height_mm=layer_height,
         target_format=target_format,
-        color_mappings=[
+        color_mappings=(
             ColorMapping(
                 input_filament=1,
-                output_palette=CyclicPalette(pattern=[1, 2]),
-            )
-        ],
+                output_palette=CyclicPalette(pattern=(1, 2)),
+            ),
+        ),
     )

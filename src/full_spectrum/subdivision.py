@@ -1,4 +1,4 @@
-"""Boundary face detection and recursive bisection tree construction."""
+"""Boundary face detection and recursive bisection encoding."""
 
 from __future__ import annotations
 
@@ -10,15 +10,8 @@ from collections.abc import Callable
 import numpy as np
 import trimesh
 
-from full_spectrum.encoding import (
-    BisectionNode,
-    LeafNode,
-    SplitNode,
-    encode_bisection_tree,
-)
-from full_spectrum.mesh import compute_face_layers
-
-_HEX_CHARS = "0123456789ABCDEF"
+from full_spectrum.encoding import HEX_CHARS
+from full_spectrum.mesh import LAYER_EPSILON_FACTOR, compute_face_layers
 
 
 def find_boundary_faces(
@@ -46,156 +39,12 @@ def find_boundary_faces(
     z_min_per_face = face_verts_z.min(axis=1)
     z_max_per_face = face_verts_z.max(axis=1)
 
-    epsilon = layer_height * 0.001
+    epsilon = layer_height * LAYER_EPSILON_FACTOR
     return (z_min_per_face < band_low - epsilon) | (z_max_per_face > band_high + epsilon)
 
 
 # -- Pure-Python vertex type used in the recursive hot path ----------------
 type Vert3 = tuple[float, float, float]
-
-
-def subdivide_triangle(
-    vertices: np.ndarray,
-    layer_height: float,
-    global_z_min: float,
-    filament_by_layer: dict[int, int],
-    default_filament: int,
-    max_depth: int = 9,
-    epsilon: float | None = None,
-) -> BisectionNode:
-    """Recursively subdivide a triangle until every leaf fits within one layer.
-
-    Public entry point — converts numpy vertices to tuples and delegates to the
-    pure-Python inner loop for performance.
-    """
-    if epsilon is None:
-        epsilon = layer_height * 0.001
-    v0 = (float(vertices[0, 0]), float(vertices[0, 1]), float(vertices[0, 2]))
-    v1 = (float(vertices[1, 0]), float(vertices[1, 1]), float(vertices[1, 2]))
-    v2 = (float(vertices[2, 0]), float(vertices[2, 1]), float(vertices[2, 2]))
-    return _subdivide(
-        v0, v1, v2, layer_height, global_z_min,
-        filament_by_layer, default_filament, max_depth, epsilon,
-    )
-
-
-def _subdivide(
-    v0: Vert3,
-    v1: Vert3,
-    v2: Vert3,
-    layer_height: float,
-    global_z_min: float,
-    filament_by_layer: dict[int, int],
-    default_filament: int,
-    max_depth: int,
-    epsilon: float,
-) -> BisectionNode:
-    """Pure-Python recursive subdivision using 1-split, 2-split and 3-split nodes."""
-    z0, z1, z2 = v0[2], v1[2], v2[2]
-    z_lo = min(z0, z1, z2)
-    z_hi = max(z0, z1, z2)
-
-    layer_lo = max(0, math.floor((z_lo - global_z_min + epsilon) / layer_height))
-    layer_hi = max(0, math.floor((z_hi - global_z_min + epsilon) / layer_height))
-
-    # Base case — triangle fits in one layer
-    if layer_lo == layer_hi:
-        return LeafNode(state=filament_by_layer.get(layer_lo, default_filament))
-
-    # Base case — depth cap
-    if max_depth <= 0:
-        centroid_z = (z0 + z1 + z2) / 3.0
-        centroid_layer = max(
-            0, math.floor((centroid_z - global_z_min + epsilon) / layer_height)
-        )
-        return LeafNode(state=filament_by_layer.get(centroid_layer, default_filament))
-
-    next_depth = max_depth - 1
-    limit_sq = layer_height * layer_height
-
-    # 3D edge length squared — used for split-type decision (3-split vs 2-split)
-    len_sq_0 = (v1[0]-v0[0])**2 + (v1[1]-v0[1])**2 + (v1[2]-v0[2])**2
-    len_sq_1 = (v2[0]-v1[0])**2 + (v2[1]-v1[1])**2 + (v2[2]-v1[2])**2
-    len_sq_2 = (v0[0]-v2[0])**2 + (v0[1]-v2[1])**2 + (v0[2]-v2[2])**2
-
-    long0 = len_sq_0 > limit_sq
-    long1 = len_sq_1 > limit_sq
-    long2 = len_sq_2 > limit_sq
-    n_long = long0 + long1 + long2
-
-    # Z-span squared — used for edge selection within 2-split (keep most horizontal)
-    dz_sq_0 = (z1 - z0) ** 2  # edge 0: v0→v1
-    dz_sq_1 = (z2 - z1) ** 2  # edge 1: v1→v2
-    dz_sq_2 = (z0 - z2) ** 2  # edge 2: v2→v0
-
-    def _mid(a: Vert3, b: Vert3) -> Vert3:
-        return ((a[0] + b[0]) * 0.5, (a[1] + b[1]) * 0.5, (a[2] + b[2]) * 0.5)
-
-    _rec = _subdivide  # local alias to avoid global lookup per call
-
-    if n_long == 3:
-        # 3-split: bisect all 3 edges, 4 children
-        m01 = _mid(v0, v1)
-        m12 = _mid(v1, v2)
-        m20 = _mid(v2, v0)
-
-        c0 = _rec(v0, m01, m20, layer_height, global_z_min, filament_by_layer, default_filament, next_depth, epsilon)
-        c1 = _rec(m01, v1, m12, layer_height, global_z_min, filament_by_layer, default_filament, next_depth, epsilon)
-        c2 = _rec(m12, v2, m20, layer_height, global_z_min, filament_by_layer, default_filament, next_depth, epsilon)
-        c3 = _rec(m01, m12, m20, layer_height, global_z_min, filament_by_layer, default_filament, next_depth, epsilon)
-
-        children = [c0, c1, c2, c3]
-        if (
-            isinstance(c0, LeafNode) and isinstance(c1, LeafNode)
-            and isinstance(c2, LeafNode) and isinstance(c3, LeafNode)
-            and c0.state == c1.state == c2.state == c3.state
-        ):
-            return c0
-        return SplitNode(split_sides=3, special_side=0, children=children)
-
-    if n_long >= 1:
-        # 2-split: keep the most horizontal edge (smallest Z-span), bisect the other two
-        # Bambu convention: special_side = kept side index, where
-        # side 0 = v1→v2, side 1 = v2→v0, side 2 = v0→v1
-        # Children: c0 = apex, c1 = middle, c2 = base (has kept edge)
-        if dz_sq_0 <= dz_sq_1 and dz_sq_0 <= dz_sq_2:
-            # Edge v0→v1 most horizontal → keep = Bambu side 2
-            special_side = 2
-            m12 = _mid(v1, v2)
-            m20 = _mid(v2, v0)
-            c0 = _rec(v2, m20, m12, layer_height, global_z_min, filament_by_layer, default_filament, next_depth, epsilon)
-            c1 = _rec(m20, v0, m12, layer_height, global_z_min, filament_by_layer, default_filament, next_depth, epsilon)
-            c2 = _rec(v0, v1, m12, layer_height, global_z_min, filament_by_layer, default_filament, next_depth, epsilon)
-        elif dz_sq_1 <= dz_sq_2:
-            # Edge v1→v2 most horizontal → keep = Bambu side 0
-            special_side = 0
-            m01 = _mid(v0, v1)
-            m20 = _mid(v2, v0)
-            c0 = _rec(v0, m01, m20, layer_height, global_z_min, filament_by_layer, default_filament, next_depth, epsilon)
-            c1 = _rec(m01, v1, m20, layer_height, global_z_min, filament_by_layer, default_filament, next_depth, epsilon)
-            c2 = _rec(v1, v2, m20, layer_height, global_z_min, filament_by_layer, default_filament, next_depth, epsilon)
-        else:
-            # Edge v2→v0 most horizontal → keep = Bambu side 1
-            special_side = 1
-            m01 = _mid(v0, v1)
-            m12 = _mid(v1, v2)
-            c0 = _rec(v1, m12, m01, layer_height, global_z_min, filament_by_layer, default_filament, next_depth, epsilon)
-            c1 = _rec(m12, v2, m01, layer_height, global_z_min, filament_by_layer, default_filament, next_depth, epsilon)
-            c2 = _rec(v2, v0, m01, layer_height, global_z_min, filament_by_layer, default_filament, next_depth, epsilon)
-
-        if (
-            isinstance(c0, LeafNode) and isinstance(c1, LeafNode) and isinstance(c2, LeafNode)
-            and c0.state == c1.state == c2.state
-        ):
-            return c0
-        return SplitNode(split_sides=2, special_side=special_side, children=[c0, c1, c2])
-
-    # n_long == 0: no edges long enough to split, assign via centroid
-    centroid_z = (z0 + z1 + z2) / 3.0
-    centroid_layer = max(
-        0, math.floor((centroid_z - global_z_min + epsilon) / layer_height)
-    )
-    return LeafNode(state=filament_by_layer.get(centroid_layer, default_filament))
 
 
 # ---------------------------------------------------------------------------
@@ -262,7 +111,7 @@ def _make_subdivider(
 
         # Depth cap: assign based on centroid
         if depth <= 0:
-            centroid_z = (z0 + z1 + z2) * 0.3333333333333333
+            centroid_z = (z0 + z1 + z2) / 3.0
             cl_f = (centroid_z - global_z_min + epsilon) * inv_lh
             cl = 0 if cl_f < 0 else int(_floor(cl_f))
             state = filament_by_layer.get(cl, default_filament)
@@ -386,7 +235,7 @@ def _make_subdivider(
             return -1
 
         # n_long == 0: no edges long enough to split, assign via centroid
-        centroid_z = (z0 + z1 + z2) * 0.3333333333333333
+        centroid_z = (z0 + z1 + z2) / 3.0
         cl_f = (centroid_z - global_z_min + epsilon) * inv_lh
         cl = 0 if cl_f < 0 else int(_floor(cl_f))
         state = filament_by_layer.get(cl, default_filament)
@@ -413,7 +262,7 @@ def _face_to_hex(
     nibbles: list[int] = []
     subdivide_fn(v0[2], v1[2], v2[2], v0, v1, v2, max_depth, nibbles)
     # Reverse nibbles → hex chars → join
-    return "".join(_HEX_CHARS[n] for n in reversed(nibbles))
+    return "".join(HEX_CHARS[n] for n in reversed(nibbles))
 
 
 # ---------------------------------------------------------------------------
@@ -498,7 +347,7 @@ def encode_boundary_faces(
     boundary_indices = np.nonzero(boundary_mask)[0]
     n_boundary = len(boundary_indices)
 
-    epsilon = layer_height * 0.001
+    epsilon = layer_height * LAYER_EPSILON_FACTOR
 
     # Pre-fetch all face vertex coords into shared memory for multiprocessing
     all_face_verts = mesh.vertices[mesh.faces].astype(np.float64)  # (F, 3, 3)

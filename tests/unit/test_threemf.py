@@ -135,10 +135,11 @@ class TestRead3MF:
             read_3mf(p)
 
     def test_sub_painted_flatten(self, tmp_path: Path) -> None:
+        # "40C0C2" encodes SplitNode(children=[Leaf(1), Leaf(3), Leaf(3)])
         p = _make_cube_3mf(tmp_path, color_attr="slic3rpe",
-                           face_colors={0: "0C1C2C"})
+                           face_colors={0: "40C0C2"})
         data = read_3mf(p, flatten=True)
-        # "0C" → filament 3
+        # Dominant filament is 3 (appears in 2 of 3 leaves)
         assert data.face_colors[0] == 3
 
 

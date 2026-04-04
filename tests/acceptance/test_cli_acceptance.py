@@ -201,7 +201,7 @@ class TestCLIFlatten:
         tris_el = etree.SubElement(mesh_el, "triangles")
         # Face 0: sub-painted (two hex codes = sub-painted)
         attrib0 = {"v1": "0", "v2": "1", "v3": "2"}
-        attrib0[f"{{{NS_SLIC3RPE}}}mmu_segmentation"] = "0C1C"
+        attrib0[f"{{{NS_SLIC3RPE}}}mmu_segmentation"] = "4882"
         etree.SubElement(tris_el, "triangle", **attrib0)
         # Face 1: normal
         etree.SubElement(tris_el, "triangle", v1="0", v2="2", v3="3")
