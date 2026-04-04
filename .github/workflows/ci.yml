@@ -66,6 +66,11 @@ jobs:
           echo "Found BambuStudio at: $BAMBU_BIN"
           echo "BAMBUSTUDIO_BIN=$BAMBU_BIN" >> "$GITHUB_ENV"
 
+          # Set LD_LIBRARY_PATH so the extracted binary finds its bundled libs
+          APPDIR=/tmp/bambu/squashfs-root
+          LIB_DIRS=$(find "$APPDIR" -name '*.so*' -printf '%h\n' | sort -u | tr '\n' ':')
+          echo "LD_LIBRARY_PATH=${LIB_DIRS}${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" >> "$GITHUB_ENV"
+
       - name: Run tests
         run: |
           pytest --tb=short -v --cov=full_spectrum --cov-report=term-missing -k "not slicer"
