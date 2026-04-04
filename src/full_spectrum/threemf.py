@@ -10,7 +10,7 @@ from pathlib import Path
 import numpy as np
 from lxml import etree
 
-from full_spectrum.encoding import filament_to_hex, hex_to_filament, is_sub_painted
+from full_spectrum.encoding import hex_to_filament, is_sub_painted
 
 logger = logging.getLogger(__name__)
 
@@ -258,7 +258,7 @@ def write_3mf(
     output_path: str | Path,
     vertices: np.ndarray,
     faces: np.ndarray,
-    face_filaments: np.ndarray,
+    face_colors: list[str],
     default_filament: int = 1,
     target_format: str = "both",
 ) -> None:
@@ -268,7 +268,7 @@ def write_3mf(
         output_path: Output .3mf file path
         vertices: (V, 3) float array of vertex coordinates
         faces: (F, 3) int array of vertex indices per triangle
-        face_filaments: (F,) int array of 1-based filament per face
+        face_colors: List of hex strings per face (empty string = default filament)
         default_filament: Default filament for the object
         target_format: "prusaslicer", "bambu", or "both"
     """
@@ -299,10 +299,9 @@ def write_3mf(
     tris_el = etree.SubElement(mesh_el, "triangles")
     for i, face in enumerate(faces):
         attrib = {"v1": str(face[0]), "v2": str(face[1]), "v3": str(face[2])}
-        filament = int(face_filaments[i])
+        hex_code = face_colors[i]
 
-        if filament != default_filament:
-            hex_code = filament_to_hex(filament)
+        if hex_code:
             if write_slic3rpe:
                 attrib[f"{{{NS_SLIC3RPE}}}mmu_segmentation"] = hex_code
             if write_paint:

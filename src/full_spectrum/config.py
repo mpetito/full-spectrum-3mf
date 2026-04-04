@@ -46,6 +46,9 @@ class FullSpectrumConfig:
     layer_height_mm: float
     target_format: str
     color_mappings: list[ColorMapping]
+    boundary_split: bool = True
+    max_split_depth: int = 9
+    boundary_strategy: str = "bisection"
 
 
 def _parse_palette(data: dict) -> CyclicPalette | GradientPalette:
@@ -110,12 +113,27 @@ def load_config(path: str | Path) -> FullSpectrumConfig:
         layer_height_mm=layer_height,
         target_format=target_format,
         color_mappings=mappings,
+        boundary_split=raw.get("boundary_split", True),
+        max_split_depth=raw.get("max_split_depth", 9),
+        boundary_strategy=raw.get("boundary_strategy", "bisection"),
     )
 
 
 def validate_config(config: FullSpectrumConfig) -> list[str]:
     """Validate config, raising ConfigError for errors, returning warnings list."""
     warnings: list[str] = []
+
+    # boundary_strategy
+    if config.boundary_strategy not in {"bisection", "geometry"}:
+        raise ConfigError(
+            f"boundary_strategy must be 'bisection' or 'geometry', got {config.boundary_strategy!r}"
+        )
+
+    # max_split_depth
+    if config.max_split_depth < 0:
+        raise ConfigError("max_split_depth must be non-negative")
+    if config.max_split_depth > 20:
+        warnings.append(f"max_split_depth {config.max_split_depth} is unusually high (>20)")
 
     # Layer height range
     if not (0.04 <= config.layer_height_mm <= 0.2):

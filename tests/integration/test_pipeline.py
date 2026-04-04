@@ -158,3 +158,54 @@ class TestPipelinePerformance:
         assert result.success
         assert result.face_count >= 100_000
         assert elapsed < 10.0, f"Took {elapsed:.1f}s, expected <10s"
+
+
+class TestPipelineBoundarySplit:
+    def test_boundary_split_on(self, cube_stl: Path, tmp_path: Path) -> None:
+        """Pipeline with boundary_split=True produces valid output."""
+        config = FullSpectrumConfig(
+            layer_height_mm=0.1,
+            target_format="both",
+            color_mappings=[
+                ColorMapping(input_filament=1, output_palette=CyclicPalette(pattern=[1, 2]))
+            ],
+            boundary_split=True,
+        )
+        out = tmp_path / "out.3mf"
+        result = process(cube_stl, config, out)
+        assert result.success
+        assert result.boundary_face_count >= 0
+        assert out.exists()
+
+    def test_boundary_split_off_identical(self, cube_stl: Path, tmp_path: Path) -> None:
+        """Without boundary_split, result has zero boundary faces."""
+        config = FullSpectrumConfig(
+            layer_height_mm=0.1,
+            target_format="both",
+            color_mappings=[
+                ColorMapping(input_filament=1, output_palette=CyclicPalette(pattern=[1, 2]))
+            ],
+            boundary_split=False,
+        )
+        out = tmp_path / "out.3mf"
+        result = process(cube_stl, config, out)
+        assert result.success
+        assert result.boundary_face_count == 0
+        assert result.boundary_face_pct == 0.0
+
+    def test_boundary_split_has_boundary_faces(self, cube_stl: Path, tmp_path: Path) -> None:
+        """A cube STL processed with boundary_split should have boundary faces."""
+        config = FullSpectrumConfig(
+            layer_height_mm=0.1,
+            target_format="both",
+            color_mappings=[
+                ColorMapping(input_filament=1, output_palette=CyclicPalette(pattern=[1, 2]))
+            ],
+            boundary_split=True,
+        )
+        out = tmp_path / "out.3mf"
+        result = process(cube_stl, config, out)
+        assert result.success
+        # A cube has side faces that span many layers — should have boundary faces
+        assert result.boundary_face_count > 0
+        assert result.boundary_face_pct > 0.0

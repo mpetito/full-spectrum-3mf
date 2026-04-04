@@ -69,6 +69,23 @@ def _setup_logging(verbose: bool, quiet: bool) -> None:
     is_flag=True,
     help="Flatten sub-painted triangles to dominant filament.",
 )
+@click.option(
+    "--boundary-split/--no-boundary-split",
+    default=None,
+    help="Enable sub-triangle coloring at Z-layer boundaries.",
+)
+@click.option(
+    "--max-split-depth",
+    type=int,
+    default=None,
+    help="Max recursion depth for boundary splitting (default: 12).",
+)
+@click.option(
+    "--geometry-slice",
+    is_flag=True,
+    default=False,
+    help="Use geometry slicing instead of bisection for boundary faces.",
+)
 @click.option("-v", "--verbose", is_flag=True, help="Enable debug logging.")
 @click.option("-q", "--quiet", is_flag=True, help="Suppress all non-error output.")
 @click.option("--dry-run", is_flag=True, help="Validate without writing output file.")
@@ -80,6 +97,9 @@ def main(
     output_path: str | None,
     target_format: str | None,
     flatten: bool,
+    boundary_split: bool | None,
+    max_split_depth: int | None,
+    geometry_slice: bool,
     verbose: bool,
     quiet: bool,
     dry_run: bool,
@@ -101,6 +121,9 @@ def main(
                     layer_height_mm=layer_height,
                     target_format=cfg.target_format,
                     color_mappings=cfg.color_mappings,
+                    boundary_split=cfg.boundary_split,
+                    max_split_depth=cfg.max_split_depth,
+                    boundary_strategy=cfg.boundary_strategy,
                 )
         elif layer_height is not None:
             fmt = target_format or "both"
@@ -117,6 +140,42 @@ def main(
                 layer_height_mm=cfg.layer_height_mm,
                 target_format=target_format,
                 color_mappings=cfg.color_mappings,
+                boundary_split=cfg.boundary_split,
+                max_split_depth=cfg.max_split_depth,
+                boundary_strategy=cfg.boundary_strategy,
+            )
+
+        # CLI --boundary-split overrides config
+        if boundary_split is not None:
+            cfg = FullSpectrumConfig(
+                layer_height_mm=cfg.layer_height_mm,
+                target_format=cfg.target_format,
+                color_mappings=cfg.color_mappings,
+                boundary_split=boundary_split,
+                max_split_depth=cfg.max_split_depth,
+                boundary_strategy=cfg.boundary_strategy,
+            )
+
+        # CLI --max-split-depth overrides config
+        if max_split_depth is not None:
+            cfg = FullSpectrumConfig(
+                layer_height_mm=cfg.layer_height_mm,
+                target_format=cfg.target_format,
+                color_mappings=cfg.color_mappings,
+                boundary_split=cfg.boundary_split,
+                max_split_depth=max_split_depth,
+                boundary_strategy=cfg.boundary_strategy,
+            )
+
+        # CLI --geometry-slice overrides strategy
+        if geometry_slice:
+            cfg = FullSpectrumConfig(
+                layer_height_mm=cfg.layer_height_mm,
+                target_format=cfg.target_format,
+                color_mappings=cfg.color_mappings,
+                boundary_split=True,
+                max_split_depth=cfg.max_split_depth,
+                boundary_strategy="geometry",
             )
 
         # Validate
@@ -129,12 +188,25 @@ def main(
             output_path = str(Path(input_file).stem + "_painted.3mf")
 
         # Run pipeline
+        show_progress = not quiet and sys.stderr.isatty()
+
+        def _progress(stage: str, done: int, total: int) -> None:
+            if total > 0:
+                pct = done * 100 // total
+                click.echo(
+                    f"\r  {stage}: {done}/{total} ({pct}%)",
+                    nl=False, err=True,
+                )
+                if done >= total:
+                    click.echo("", err=True)  # newline after completion
+
         result = process(
             input_path=input_file,
             config=cfg,
             output_path=output_path,
             flatten=flatten,
             dry_run=dry_run,
+            progress_callback=_progress if show_progress else None,
         )
 
         # Report warnings
@@ -146,6 +218,11 @@ def main(
             click.echo(f"Faces: {result.face_count}")
             click.echo(f"Layers: {result.layer_count}")
             click.echo(f"Distribution: {result.filament_distribution}")
+            if result.boundary_face_count > 0:
+                click.echo(
+                    f"Boundary faces: {result.boundary_face_count} "
+                    f"({result.boundary_face_pct:.1f}%)"
+                )
 
         if not quiet:
             if dry_run:

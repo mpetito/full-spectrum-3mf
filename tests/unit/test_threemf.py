@@ -149,8 +149,8 @@ class TestWrite3MF:
         out = tmp_path / "out.3mf"
         verts = np.array([[0,0,0],[1,0,0],[1,1,0],[0,1,0]], dtype=np.float64)
         faces = np.array([[0,1,2],[0,2,3]], dtype=np.int32)
-        filaments = np.array([1, 2], dtype=np.int32)
-        write_3mf(out, verts, faces, filaments, target_format=target_format, **kwargs)
+        face_colors = ["", "8"]
+        write_3mf(out, verts, faces, face_colors, target_format=target_format, **kwargs)
         assert out.exists()
         with zipfile.ZipFile(out, "r") as zf:
             model_xml = zf.read("3D/3dmodel.model")
