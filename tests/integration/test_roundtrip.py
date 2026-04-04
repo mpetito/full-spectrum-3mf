@@ -38,7 +38,7 @@ class TestRoundtripSTL:
             layer_height_mm=1.0,
             target_format="both",
             color_mappings=[
-                ColorMapping(input_filament=1, output_palette=CyclicPalette(pattern=[1, 2]))
+                ColorMapping(input_filament=1, output_palette=CyclicPalette(pattern=(1, 2)))
             ],
         )
         out = tmp_path / "out.3mf"
@@ -61,7 +61,7 @@ class TestRoundtripSTL:
             layer_height_mm=0.5,
             target_format="prusaslicer",
             color_mappings=[
-                ColorMapping(input_filament=1, output_palette=CyclicPalette(pattern=[1, 3]))
+                ColorMapping(input_filament=1, output_palette=CyclicPalette(pattern=(1, 3)))
             ],
         )
         out = tmp_path / "out.3mf"

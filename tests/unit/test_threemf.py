@@ -135,10 +135,11 @@ class TestRead3MF:
             read_3mf(p)
 
     def test_sub_painted_flatten(self, tmp_path: Path) -> None:
+        # "40C0C2" encodes SplitNode(children=[Leaf(1), Leaf(3), Leaf(3)])
         p = _make_cube_3mf(tmp_path, color_attr="slic3rpe",
-                           face_colors={0: "0C1C2C"})
+                           face_colors={0: "40C0C2"})
         data = read_3mf(p, flatten=True)
-        # "0C" → filament 3
+        # Dominant filament is 3 (appears in 2 of 3 leaves)
         assert data.face_colors[0] == 3
 
 
@@ -149,8 +150,8 @@ class TestWrite3MF:
         out = tmp_path / "out.3mf"
         verts = np.array([[0,0,0],[1,0,0],[1,1,0],[0,1,0]], dtype=np.float64)
         faces = np.array([[0,1,2],[0,2,3]], dtype=np.int32)
-        filaments = np.array([1, 2], dtype=np.int32)
-        write_3mf(out, verts, faces, filaments, target_format=target_format, **kwargs)
+        face_colors = ["", "8"]
+        write_3mf(out, verts, faces, face_colors, target_format=target_format, **kwargs)
         assert out.exists()
         with zipfile.ZipFile(out, "r") as zf:
             model_xml = zf.read("3D/3dmodel.model")

@@ -93,8 +93,7 @@ Palette configurations are JSON files. See [docs/PALETTE_SCHEMA.md](docs/PALETTE
       "input_filament": 1,
       "output_palette": {
         "type": "gradient",
-        "stops": [[0.0, 1], [1.0, 2]],
-        "max_period": 8
+        "stops": [[0.0, 1], [1.0, 2]]
       }
     }
   ]

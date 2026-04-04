@@ -211,11 +211,11 @@ Given a transition from color A to color B over a Z range, a normalized position
 The FullSpectrum approach specifically: **the minority color anchors to exactly 1 layer, and the majority color's count scales with the ratio**. So for R=0.25 (25% B), the pattern is B-A-A-A (1 B, 3 A); for R=0.33, it is B-A-A (1 B, 2 A); for R=0.5, it is A-B (1 each). This prevents sudden jumps in cadence.[^16]
 
 ```python
-def gradient_palette_at_ratio(ratio: float, color_a: int, color_b: int, 
-                               max_period: int = 8) -> list[int]:
+def gradient_palette_at_ratio(ratio: float, color_a: int, color_b: int) -> list[int]:
     """
     Returns a repeating palette pattern for blend ratio.
     ratio=0.0 -> all A; ratio=1.0 -> all B
+    Uses sequential error diffusion to select colors.
     """
     ratio = max(0.0, min(1.0, ratio))
     if ratio < 0.01: return [color_a]
@@ -223,16 +223,15 @@ def gradient_palette_at_ratio(ratio: float, color_a: int, color_b: int,
     # Minority anchors to 1 layer, majority scales
     if ratio <= 0.5:
         minority, majority = color_b, color_a
-        period = round(1.0 / ratio) if ratio > 0 else max_period
+        period = round(1.0 / ratio) if ratio > 0 else 8
     else:
         minority, majority = color_a, color_b
-        period = round(1.0 / (1.0 - ratio)) if ratio < 1 else max_period
-    period = min(period, max_period)
+        period = round(1.0 / (1.0 - ratio)) if ratio < 1 else 8
     pattern = [minority] + [majority] * (period - 1)
     return pattern
 
 def apply_gradient(layer_idx: int, layer_within_region: int, region_total_layers: int,
-                   stops: list[tuple[float, int]], max_period: int = 8) -> int:
+                   stops: list[tuple[float, int]]) -> int:
     """
     stops: list of (t, extruder_1based) where t in [0.0, 1.0]
     Interpolates between stop pairs to find palette at current layer.
@@ -244,7 +243,7 @@ def apply_gradient(layer_idx: int, layer_within_region: int, region_total_layers
         t1, c1 = stops[i + 1]
         if t0 <= t <= t1:
             local_t = (t - t0) / max(t1 - t0, 1e-9)
-            pattern = gradient_palette_at_ratio(local_t, c0, c1, max_period)
+            pattern = gradient_palette_at_ratio(local_t, c0, c1)
             return pattern[layer_idx % len(pattern)]
     return stops[-1][^1]
 ```
@@ -269,8 +268,7 @@ For pre-painted input meshes, each input color maps to its own independent outpu
       "input_extruder": 2,
       "output_palette": {
         "type": "gradient",
-        "stops": [[0.0, 3], [1.0, 4]],
-        "max_period": 8
+        "stops": [[0.0, 3], [1.0, 4]]
       }
     }
   ]

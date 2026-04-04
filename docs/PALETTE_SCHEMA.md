@@ -50,7 +50,6 @@ Full Spectrum uses JSON configuration files to define how input filament slots m
 |-------|------|----------|-------------|
 | `type` | string | Yes | Must be `"gradient"`. |
 | `stops` | array | Yes | Array of `[t, filament]` pairs. `t` ∈ [0.0, 1.0], sorted ascending. At least 2 stops required. |
-| `max_period` | int | No | Maximum dither period. Default: 8. Higher values produce finer gradients but more filament changes. |
 
 ## Validation Rules
 
@@ -93,8 +92,7 @@ Filament 1 = red, filament 2 = blue → alternating layers produce perceived pur
       "input_filament": 1,
       "output_palette": {
         "type": "gradient",
-        "stops": [[0.0, 1], [1.0, 3]],
-        "max_period": 8
+        "stops": [[0.0, 1], [1.0, 3]]
       }
     }
   ]
@@ -121,8 +119,7 @@ Bottom is 100% filament 1 (red), smoothly transitioning to 100% filament 3 (yell
       "input_filament": 2,
       "output_palette": {
         "type": "gradient",
-        "stops": [[0.0, 3], [0.5, 4], [1.0, 5]],
-        "max_period": 6
+        "stops": [[0.0, 3], [0.5, 4], [1.0, 5]]
       }
     }
   ]

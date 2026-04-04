@@ -110,7 +110,7 @@ class TestDefaultConfig:
         m = config.color_mappings[0]
         assert m.input_filament == 1
         assert isinstance(m.output_palette, CyclicPalette)
-        assert m.output_palette.pattern == [1, 2]
+        assert m.output_palette.pattern == (1, 2)
 
 
 class TestParseConfigEdgeCases:
@@ -220,9 +220,71 @@ class TestValidateConfigEdgeCases:
             color_mappings=[
                 ColorMapping(
                     input_filament=1,
-                    output_palette=CyclicPalette(pattern=[1, 99]),
+                    output_palette=CyclicPalette(pattern=(1, 99)),
                 )
             ],
         )
         with pytest.raises(ConfigError, match="filament 99"):
             validate_config(config)
+
+
+class TestConfigBoundarySplitFields:
+    def test_default_boundary_split(self) -> None:
+        config = default_config(0.1)
+        assert config.boundary_split is True
+        assert config.max_split_depth == 9
+        assert config.boundary_strategy == "bisection"
+
+    def test_load_with_boundary_fields(self, tmp_path: Path) -> None:
+        cfg = {
+            "layer_height_mm": 0.1,
+            "color_mappings": [],
+            "boundary_split": True,
+            "max_split_depth": 8,
+        }
+        p = tmp_path / "c.json"
+        p.write_text(json.dumps(cfg), encoding="utf-8")
+        config = load_config(p)
+        assert config.boundary_split is True
+        assert config.max_split_depth == 8
+
+    def test_validate_negative_max_split_depth(self) -> None:
+        config = FullSpectrumConfig(
+            layer_height_mm=0.1,
+            target_format="both",
+            color_mappings=[],
+            max_split_depth=-1,
+        )
+        with pytest.raises(ConfigError, match="max_split_depth"):
+            validate_config(config)
+
+    def test_validate_high_max_split_depth_warning(self) -> None:
+        config = FullSpectrumConfig(
+            layer_height_mm=0.1,
+            target_format="both",
+            color_mappings=[],
+            max_split_depth=25,
+        )
+        warnings = validate_config(config)
+        assert any("unusually high" in w for w in warnings)
+
+    def test_validate_invalid_boundary_strategy(self) -> None:
+        config = FullSpectrumConfig(
+            layer_height_mm=0.1,
+            target_format="both",
+            color_mappings=[],
+            boundary_strategy="invalid",
+        )
+        with pytest.raises(ConfigError, match="boundary_strategy"):
+            validate_config(config)
+
+    def test_load_with_boundary_strategy(self, tmp_path: Path) -> None:
+        cfg = {
+            "layer_height_mm": 0.1,
+            "color_mappings": [],
+            "boundary_strategy": "geometry",
+        }
+        p = tmp_path / "c.json"
+        p.write_text(json.dumps(cfg), encoding="utf-8")
+        config = load_config(p)
+        assert config.boundary_strategy == "geometry"

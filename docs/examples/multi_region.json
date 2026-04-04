@@ -13,8 +13,7 @@
       "input_filament": 2,
       "output_palette": {
         "type": "gradient",
-        "stops": [[0.0, 3], [0.5, 4], [1.0, 5]],
-        "max_period": 6
+        "stops": [[0.0, 3], [0.5, 4], [1.0, 5]]
       }
     }
   ]

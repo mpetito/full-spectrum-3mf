@@ -10,11 +10,25 @@ from pathlib import Path
 import numpy as np
 from lxml import etree
 
-from full_spectrum.encoding import filament_to_hex, hex_to_filament, is_sub_painted
+from full_spectrum.encoding import BisectionNode, hex_to_filament, is_sub_painted, decode_bisection_tree, LeafNode
 
 logger = logging.getLogger(__name__)
 
 _SECURE_PARSER = etree.XMLParser(resolve_entities=False, no_network=True)
+
+
+def _dominant_filament(tree: BisectionNode) -> int:
+    """Find the most common leaf state in a bisection tree."""
+    counts: dict[int, int] = {}
+    stack = [tree]
+    while stack:
+        node = stack.pop()
+        if isinstance(node, LeafNode):
+            counts[node.state] = counts.get(node.state, 0) + 1
+        else:
+            stack.extend(node.children)
+    # Return the state with the highest count; break ties by largest state
+    return max(counts, key=lambda s: (counts[s], s))
 
 
 class ThreeMFError(Exception):
@@ -155,12 +169,19 @@ def read_3mf(path: str | Path, flatten: bool = False) -> ThreeMFData:
                             f"Sub-painted triangle detected at face {i}: {hex_str!r}. "
                             "Use --flatten to simplify to dominant filament."
                         )
-                    # Flatten: take first 2 chars as dominant
-                    hex_str = hex_str[:2] if len(hex_str) >= 2 else hex_str[:1]
-                try:
-                    face_colors[i] = hex_to_filament(hex_str)
-                except ValueError as e:
-                    raise ThreeMFError(f"Face {i}: {e}") from e
+                    # Flatten: decode tree and take dominant (most frequent) filament
+                    try:
+                        tree = decode_bisection_tree(hex_str)
+                    except ValueError as e:
+                        raise ThreeMFError(f"Face {i}: {e}") from e
+                    dominant = _dominant_filament(tree)
+                    if dominant > 0:
+                        face_colors[i] = dominant
+                else:
+                    try:
+                        face_colors[i] = hex_to_filament(hex_str)
+                    except ValueError as e:
+                        raise ThreeMFError(f"Face {i}: {e}") from e
 
         faces = np.array(faces_list, dtype=np.int32)
 
@@ -258,7 +279,7 @@ def write_3mf(
     output_path: str | Path,
     vertices: np.ndarray,
     faces: np.ndarray,
-    face_filaments: np.ndarray,
+    face_colors: list[str],
     default_filament: int = 1,
     target_format: str = "both",
 ) -> None:
@@ -268,10 +289,17 @@ def write_3mf(
         output_path: Output .3mf file path
         vertices: (V, 3) float array of vertex coordinates
         faces: (F, 3) int array of vertex indices per triangle
-        face_filaments: (F,) int array of 1-based filament per face
+        face_colors: List of hex strings per face (empty string = default filament)
         default_filament: Default filament for the object
         target_format: "prusaslicer", "bambu", or "both"
     """
+    if len(face_colors) != len(faces):
+        raise ThreeMFError(
+            f"face_colors length ({len(face_colors)}) != faces length ({len(faces)})"
+        )
+    if not np.all(np.isfinite(vertices)):
+        raise ThreeMFError("Vertices contain NaN or Inf values")
+
     output_path = Path(output_path)
 
     # Build 3dmodel.model XML
@@ -293,16 +321,15 @@ def write_3mf(
     # Vertices
     verts_el = etree.SubElement(mesh_el, "vertices")
     for v in vertices:
-        etree.SubElement(verts_el, "vertex", x=str(v[0]), y=str(v[1]), z=str(v[2]))
+        etree.SubElement(verts_el, "vertex", x=f"{v[0]:.9g}", y=f"{v[1]:.9g}", z=f"{v[2]:.9g}")
 
     # Triangles
     tris_el = etree.SubElement(mesh_el, "triangles")
     for i, face in enumerate(faces):
         attrib = {"v1": str(face[0]), "v2": str(face[1]), "v3": str(face[2])}
-        filament = int(face_filaments[i])
+        hex_code = face_colors[i]
 
-        if filament != default_filament:
-            hex_code = filament_to_hex(filament)
+        if hex_code:
             if write_slic3rpe:
                 attrib[f"{{{NS_SLIC3RPE}}}mmu_segmentation"] = hex_code
             if write_paint:

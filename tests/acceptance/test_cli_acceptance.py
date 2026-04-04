@@ -201,7 +201,7 @@ class TestCLIFlatten:
         tris_el = etree.SubElement(mesh_el, "triangles")
         # Face 0: sub-painted (two hex codes = sub-painted)
         attrib0 = {"v1": "0", "v2": "1", "v3": "2"}
-        attrib0[f"{{{NS_SLIC3RPE}}}mmu_segmentation"] = "0C1C"
+        attrib0[f"{{{NS_SLIC3RPE}}}mmu_segmentation"] = "4882"
         etree.SubElement(tris_el, "triangle", **attrib0)
         # Face 1: normal
         etree.SubElement(tris_el, "triangle", v1="0", v2="2", v3="3")
@@ -244,3 +244,45 @@ class TestCLIExceptionHandling:
             result = runner.invoke(main, [str(cube_stl), "-l", "0.1"])
         assert result.exit_code == 4
         assert "Unexpected error" in result.output
+
+
+class TestBoundarySplitCLI:
+    def test_boundary_split_flag(self, runner: CliRunner, cube_stl: Path, tmp_path: Path) -> None:
+        out = tmp_path / "out.3mf"
+        result = runner.invoke(main, [
+            str(cube_stl), "-l", "0.1", "-o", str(out), "--boundary-split"
+        ])
+        assert result.exit_code == 0
+        assert out.exists()
+
+    def test_no_boundary_split_flag(self, runner: CliRunner, cube_stl: Path, tmp_path: Path) -> None:
+        out = tmp_path / "out.3mf"
+        result = runner.invoke(main, [
+            str(cube_stl), "-l", "0.1", "-o", str(out), "--no-boundary-split"
+        ])
+        assert result.exit_code == 0
+
+    def test_max_split_depth_flag(self, runner: CliRunner, cube_stl: Path, tmp_path: Path) -> None:
+        out = tmp_path / "out.3mf"
+        result = runner.invoke(main, [
+            str(cube_stl), "-l", "0.1", "-o", str(out),
+            "--boundary-split", "--max-split-depth", "4"
+        ])
+        assert result.exit_code == 0
+
+    def test_verbose_boundary_stats(self, runner: CliRunner, cube_stl: Path, tmp_path: Path) -> None:
+        out = tmp_path / "out.3mf"
+        result = runner.invoke(main, [
+            str(cube_stl), "-l", "0.1", "-o", str(out),
+            "--boundary-split", "-v"
+        ])
+        assert result.exit_code == 0
+        assert "Boundary faces:" in result.output
+
+    def test_geometry_slice_flag(self, runner: CliRunner, cube_stl: Path, tmp_path: Path) -> None:
+        out = tmp_path / "out.3mf"
+        result = runner.invoke(main, [
+            str(cube_stl), "-l", "0.1", "-o", str(out), "--geometry-slice"
+        ])
+        assert result.exit_code == 0
+        assert out.exists()

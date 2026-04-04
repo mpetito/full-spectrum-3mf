@@ -1,12 +1,12 @@
 {
-  "layer_height_mm": 0.08,
-  "target_format": "both",
+  "layer_height_mm": 0.10,
+  "target_format": "bambu",
   "color_mappings": [
     {
       "input_filament": 1,
       "output_palette": {
         "type": "gradient",
-        "stops": [[0.0, 1], [1.0, 3]]
+        "stops": [[0.0, 1], [0.4, 2], [0.8, 3], [1.0, 1]]
       }
     }
   ]
