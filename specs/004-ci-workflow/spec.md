@@ -17,7 +17,7 @@ Add a GitHub Actions CI workflow that runs all tests on every push/PR to `main`,
 ### In Scope
 
 - GitHub Actions workflow file (`.github/workflows/ci.yml`)
-- Python 3.12 matrix on Ubuntu
+- Python 3.12 on Ubuntu
 - Unit, integration, and CLI acceptance tests (always run)
 - Slicer E2E tests via downloaded BambuStudio AppImage (best-effort)
 - pytest-cov coverage reporting

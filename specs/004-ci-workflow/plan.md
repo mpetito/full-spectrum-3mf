@@ -1,20 +1,21 @@
 # Plan: CI Workflow
 
-**Spec**: [specs/004-ci-workflow/spec.md](specs/004-ci-workflow/spec.md) | **Date**: 2026-04-04
+**Spec**: [specs/004-ci-workflow/spec.md](./spec.md) | **Date**: 2026-04-04
 
 ## Summary
 
-Add a single GitHub Actions workflow file that runs the full test suite on every push/PR to `main`. The workflow installs Python 3.12, project dependencies, optionally downloads BambuStudio AppImage for slicer E2E tests, then executes pytest with coverage reporting. BambuStudio provisioning is best-effort — slicer tests auto-skip if the binary is unavailable.
+Add a GitHub Actions workflow with two parallel jobs: a required `test` job that runs the full non-slicer test suite on `ubuntu-latest`, and a best-effort `slicer` job on `ubuntu-22.04` that downloads BambuStudio AppImage and runs slicer E2E tests. The slicer job uses `continue-on-error: true` at the job level so slicer issues never block PRs.
 
 ## Architecture Decisions
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
 | Single workflow file | `.github/workflows/ci.yml` | Simple project; one workflow covers all test types |
+| Two parallel jobs | `test` (required) + `slicer` (best-effort) | Core tests must always pass; slicer has fragile Fedora AppImage deps |
 | BambuStudio download | `gh release download` from `bambulab/BambuStudio` | Reliable; uses GitHub API via `gh` CLI (pre-installed on runners) |
 | AppImage extraction | `--appimage-extract` | FUSE unavailable on GitHub Actions runners |
-| Binary path | `squashfs-root/usr/bin/bambu-studio` | Standard AppImage extraction layout; lowercase binary name on Linux |
-| `continue-on-error` | On BambuStudio download step only | Slicer download is best-effort; pytest fixture handles skip |
+| Binary path | `squashfs-root/AppRun` wrapper | AppRun handles `LD_LIBRARY_PATH` for bundled libs |
+| `continue-on-error` | On `slicer` job level | Slicer AppImage has fragile Fedora/Ubuntu ABI deps; failures visible but non-blocking |
 
 ## Implementation Phases
 
