@@ -170,7 +170,10 @@ def read_3mf(path: str | Path, flatten: bool = False) -> ThreeMFData:
                             "Use --flatten to simplify to dominant filament."
                         )
                     # Flatten: decode tree and take dominant (most frequent) filament
-                    tree = decode_bisection_tree(hex_str)
+                    try:
+                        tree = decode_bisection_tree(hex_str)
+                    except ValueError as e:
+                        raise ThreeMFError(f"Face {i}: {e}") from e
                     dominant = _dominant_filament(tree)
                     if dominant > 0:
                         face_colors[i] = dominant

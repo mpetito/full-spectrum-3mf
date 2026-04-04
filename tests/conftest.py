@@ -39,7 +39,7 @@ def simple_config() -> FullSpectrumConfig:
         layer_height_mm=0.1,
         target_format="both",
         color_mappings=[
-            ColorMapping(input_filament=1, output_palette=CyclicPalette(pattern=[1, 2]))
+            ColorMapping(input_filament=1, output_palette=CyclicPalette(pattern=(1, 2)))
         ],
     )
 

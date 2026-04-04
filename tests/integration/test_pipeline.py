@@ -108,7 +108,7 @@ class TestPipelineUnmappedFilament:
             layer_height_mm=0.1,
             target_format="both",
             color_mappings=[
-                ColorMapping(input_filament=5, output_palette=CyclicPalette(pattern=[3, 4]))
+                ColorMapping(input_filament=5, output_palette=CyclicPalette(pattern=(3, 4)))
             ],
         )
         out = tmp_path / "out.3mf"
@@ -124,8 +124,8 @@ class TestPipeline3MF:
             layer_height_mm=1.0,
             target_format="both",
             color_mappings=[
-                ColorMapping(input_filament=1, output_palette=CyclicPalette(pattern=[1, 3])),
-                ColorMapping(input_filament=2, output_palette=CyclicPalette(pattern=[2, 4])),
+                ColorMapping(input_filament=1, output_palette=CyclicPalette(pattern=(1, 3))),
+                ColorMapping(input_filament=2, output_palette=CyclicPalette(pattern=(2, 4))),
             ],
         )
         out = tmp_path / "repainted.3mf"
@@ -147,7 +147,7 @@ class TestPipelinePerformance:
             layer_height_mm=0.1,
             target_format="both",
             color_mappings=[
-                ColorMapping(input_filament=1, output_palette=CyclicPalette(pattern=[1, 2]))
+                ColorMapping(input_filament=1, output_palette=CyclicPalette(pattern=(1, 2)))
             ],
         )
         out = tmp_path / "large_out.3mf"
@@ -167,7 +167,7 @@ class TestPipelineBoundarySplit:
             layer_height_mm=0.1,
             target_format="both",
             color_mappings=[
-                ColorMapping(input_filament=1, output_palette=CyclicPalette(pattern=[1, 2]))
+                ColorMapping(input_filament=1, output_palette=CyclicPalette(pattern=(1, 2)))
             ],
             boundary_split=True,
         )
@@ -183,7 +183,7 @@ class TestPipelineBoundarySplit:
             layer_height_mm=0.1,
             target_format="both",
             color_mappings=[
-                ColorMapping(input_filament=1, output_palette=CyclicPalette(pattern=[1, 2]))
+                ColorMapping(input_filament=1, output_palette=CyclicPalette(pattern=(1, 2)))
             ],
             boundary_split=False,
         )
@@ -199,7 +199,7 @@ class TestPipelineBoundarySplit:
             layer_height_mm=0.1,
             target_format="both",
             color_mappings=[
-                ColorMapping(input_filament=1, output_palette=CyclicPalette(pattern=[1, 2]))
+                ColorMapping(input_filament=1, output_palette=CyclicPalette(pattern=(1, 2)))
             ],
             boundary_split=True,
         )

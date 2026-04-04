@@ -189,8 +189,15 @@ def process(
             if parent_idx in face_colors:
                 new_face_colors[new_idx] = face_colors[parent_idx]
         face_colors = new_face_colors
-        # Replace mesh with the remeshed version
-        mesh = trimesh.Trimesh(vertices=new_vertices, faces=new_faces)
+        # Replace mesh with the remeshed version without trimesh processing,
+        # which can merge/reindex geometry and invalidate parent_map-based
+        # face color remapping.
+        mesh = trimesh.Trimesh(
+            vertices=new_vertices,
+            faces=new_faces,
+            process=False,
+            validate=False,
+        )
         n_faces = len(new_faces)
         if progress_callback is not None:
             progress_callback("remesh", 1, 1)

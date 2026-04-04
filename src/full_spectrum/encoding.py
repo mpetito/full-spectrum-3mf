@@ -72,7 +72,7 @@ class SplitNode(BisectionNode):
     """Interior split node representing a 1-, 2-, or 3-split subdivision."""
 
     split_sides: int  # Number of split sides encoded by this node
-    special_side: int  # Edge index that IS split: 0=v0→v1, 1=v1→v2, 2=v2→v0
+    special_side: int  # For 1-/3-split: edge that is split; for 2-split: edge kept intact. 0=v0→v1, 1=v1→v2, 2=v2→v0
     children: list[BisectionNode]  # Child nodes; length must be split_sides + 1
 
     def __post_init__(self) -> None:

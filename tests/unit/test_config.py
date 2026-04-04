@@ -220,7 +220,7 @@ class TestValidateConfigEdgeCases:
             color_mappings=[
                 ColorMapping(
                     input_filament=1,
-                    output_palette=CyclicPalette(pattern=[1, 99]),
+                    output_palette=CyclicPalette(pattern=(1, 99)),
                 )
             ],
         )
