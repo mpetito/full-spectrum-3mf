@@ -29,3 +29,6 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "slicer: end-to-end tests requiring a slicer binary (OrcaSlicer or BambuStudio)",
+]
