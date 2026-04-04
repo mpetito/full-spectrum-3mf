@@ -50,26 +50,25 @@ jobs:
           cd /tmp/bambu
           "$APPIMAGE" --appimage-extract
 
-          # Find the actual binary
-          BAMBU_BIN=$(find /tmp/bambu/squashfs-root -name 'bambu-studio' -type f | head -1)
-          if [ -z "$BAMBU_BIN" ]; then
-            # Try alternative name
-            BAMBU_BIN=$(find /tmp/bambu/squashfs-root -name 'BambuStudio' -type f | head -1)
-          fi
-
-          if [ -z "$BAMBU_BIN" ]; then
-            echo "Could not find BambuStudio binary in extracted AppImage"
-            find /tmp/bambu/squashfs-root/usr/bin/ -type f || true
-            exit 1
-          fi
-
-          echo "Found BambuStudio at: $BAMBU_BIN"
-          echo "BAMBUSTUDIO_BIN=$BAMBU_BIN" >> "$GITHUB_ENV"
-
-          # Set LD_LIBRARY_PATH so the extracted binary finds its bundled libs
+          # Find the AppRun wrapper (handles LD_LIBRARY_PATH natively)
           APPDIR=/tmp/bambu/squashfs-root
-          LIB_DIRS=$(find "$APPDIR" -name '*.so*' -printf '%h\n' | sort -u | tr '\n' ':')
-          echo "LD_LIBRARY_PATH=${LIB_DIRS}${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" >> "$GITHUB_ENV"
+          if [ -x "$APPDIR/AppRun" ]; then
+            echo "Found AppRun wrapper"
+            echo "BAMBUSTUDIO_BIN=$APPDIR/AppRun" >> "$GITHUB_ENV"
+          else
+            # Fallback: find the binary directly
+            BAMBU_BIN=$(find "$APPDIR" -name 'bambu-studio' -type f | head -1)
+            if [ -z "$BAMBU_BIN" ]; then
+              BAMBU_BIN=$(find "$APPDIR" -name 'BambuStudio' -type f | head -1)
+            fi
+            if [ -z "$BAMBU_BIN" ]; then
+              echo "Could not find BambuStudio binary in extracted AppImage"
+              find "$APPDIR/usr/bin/" -type f || true
+              exit 1
+            fi
+            echo "Found BambuStudio at: $BAMBU_BIN"
+            echo "BAMBUSTUDIO_BIN=$BAMBU_BIN" >> "$GITHUB_ENV"
+          fi
 
       - name: Run tests
         run: |
