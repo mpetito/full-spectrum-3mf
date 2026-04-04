@@ -20,72 +20,63 @@ jobs:
       - name: Install dependencies
         run: pip install -e ".[dev]"
 
+      - name: Run tests
+        run: |
+          pytest --tb=short -v --cov=full_spectrum --cov-report=term-missing
+
+  slicer:
+    runs-on: ubuntu-22.04
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+
       - name: Install slicer runtime dependencies
-        continue-on-error: true
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq libegl1 libopengl0 libgl1 libglib2.0-0 \
-            libfontconfig1 libxkbcommon0 libdbus-1-3 \
+            libfontconfig1 libxkbcommon0 libdbus-1-3 libgtk-3-0 \
             gstreamer1.0-plugins-base libgstreamer-plugins-base1.0-0 \
-            libgtk-3-0 libsoup2.4-1 libsecret-1-0 libnotify4 \
-            libwebkit2gtk-4.1-0 > /dev/null 2>&1 || true
+            libsoup2.4-1 libsecret-1-0 libnotify4 libosmesa6 \
+            libwebkit2gtk-4.0-37 libjavascriptcoregtk-4.0-18 \
+            ffmpeg libavcodec-extra > /dev/null 2>&1
 
       - name: Download BambuStudio AppImage
-        id: bambu
-        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          # Download latest Linux AppImage from BambuStudio releases
           gh release download --repo bambulab/BambuStudio \
             --pattern '*linux*.AppImage' \
             --dir /tmp/bambu \
-            --skip-existing || exit 1
+            --skip-existing
 
           APPIMAGE=$(find /tmp/bambu -name '*.AppImage' | head -1)
-          if [ -z "$APPIMAGE" ]; then
-            echo "No AppImage found"
-            exit 1
-          fi
-
           chmod +x "$APPIMAGE"
           cd /tmp/bambu
           "$APPIMAGE" --appimage-extract
 
-          # Find the AppRun wrapper (handles LD_LIBRARY_PATH natively)
+          # Prefer AppRun wrapper for proper lib resolution
           APPDIR=/tmp/bambu/squashfs-root
           if [ -x "$APPDIR/AppRun" ]; then
-            echo "Found AppRun wrapper"
             echo "BAMBUSTUDIO_BIN=$APPDIR/AppRun" >> "$GITHUB_ENV"
           else
-            # Fallback: find the binary directly
-            BAMBU_BIN=$(find "$APPDIR" -name 'bambu-studio' -type f | head -1)
-            if [ -z "$BAMBU_BIN" ]; then
-              BAMBU_BIN=$(find "$APPDIR" -name 'BambuStudio' -type f | head -1)
-            fi
-            if [ -z "$BAMBU_BIN" ]; then
-              echo "Could not find BambuStudio binary in extracted AppImage"
-              find "$APPDIR/usr/bin/" -type f || true
-              exit 1
-            fi
-            echo "Found BambuStudio at: $BAMBU_BIN"
+            BAMBU_BIN=$(find "$APPDIR" -name 'bambu-studio' -o -name 'BambuStudio' | head -1)
             echo "BAMBUSTUDIO_BIN=$BAMBU_BIN" >> "$GITHUB_ENV"
           fi
 
-      - name: Run tests
-        run: |
-          pytest --tb=short -v --cov=full_spectrum --cov-report=term-missing -k "not slicer"
+          # Show any remaining missing libraries
+          BIN=$(find "$APPDIR" -name 'bambu-studio' -type f | head -1)
+          echo "=== Missing shared libraries ==="
+          ldd "$BIN" 2>&1 | grep "not found" || echo "All libraries resolved!"
 
       - name: Run slicer E2E tests
-        if: env.BAMBUSTUDIO_BIN != ''
-        continue-on-error: true
         run: |
-          # Check for missing shared libraries before running tests
-          APPDIR=/tmp/bambu/squashfs-root
-          BIN=$(find "$APPDIR" -name 'bambu-studio' -type f | head -1)
-          if [ -n "$BIN" ]; then
-            echo "=== Missing shared libraries ==="
-            ldd "$BIN" 2>&1 | grep "not found" || echo "All libraries resolved!"
-          fi
           pytest --tb=short -v -m slicer
