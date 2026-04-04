@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Download BambuStudio AppImage
+        id: bambu
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Download latest Linux AppImage from BambuStudio releases
+          gh release download --repo bambulab/BambuStudio \
+            --pattern '*Linux*.AppImage' \
+            --dir /tmp/bambu \
+            --skip-existing || exit 1
+
+          APPIMAGE=$(find /tmp/bambu -name '*.AppImage' | head -1)
+          if [ -z "$APPIMAGE" ]; then
+            echo "No AppImage found"
+            exit 1
+          fi
+
+          chmod +x "$APPIMAGE"
+          cd /tmp/bambu
+          "$APPIMAGE" --appimage-extract
+
+          # Find the actual binary
+          BAMBU_BIN=$(find /tmp/bambu/squashfs-root -name 'bambu-studio' -type f | head -1)
+          if [ -z "$BAMBU_BIN" ]; then
+            # Try alternative name
+            BAMBU_BIN=$(find /tmp/bambu/squashfs-root -name 'BambuStudio' -type f | head -1)
+          fi
+
+          if [ -z "$BAMBU_BIN" ]; then
+            echo "Could not find BambuStudio binary in extracted AppImage"
+            find /tmp/bambu/squashfs-root/usr/bin/ -type f || true
+            exit 1
+          fi
+
+          echo "Found BambuStudio at: $BAMBU_BIN"
+          echo "BAMBUSTUDIO_BIN=$BAMBU_BIN" >> "$GITHUB_ENV"
+
+      - name: Run tests
+        env:
+          BAMBUSTUDIO_BIN: ${{ env.BAMBUSTUDIO_BIN }}
+        run: |
+          pytest --tb=short -v --cov=full_spectrum --cov-report=term-missing
